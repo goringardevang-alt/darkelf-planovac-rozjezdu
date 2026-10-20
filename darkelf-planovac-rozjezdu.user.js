@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dark Elf - Plánovač rozjezdů
 // @namespace    https://github.com/goringardevang-alt/darkelf-planovac-rozjezdu
-// @version      1.48
+// @version      1.50
 // @description  Plán dobývání neutrálek na dnes, zítra a pozítří z jedné i víc tvých zemí: struktura rozjezdu na klik, přeposílky, limit verbu, rozpočet, tlačítko Navrhni (nejmenší verb a ztráty), vyplnění útoku na stránce Vojsko a kontrola odeslaných útoků. Obsahuje Core Utils v2.41.
 // @author       Gorin & Claude
 // @match        https://www.darkelf.cz/*
@@ -14,7 +14,7 @@
 // ==/UserScript==
 
 // ─────────────────────────────────────────────────────────────
-// Dark Elf - Plánovač rozjezdů v1.48 (s Core Utils v2.41)
+// Dark Elf - Plánovač rozjezdů v1.50 (s Core Utils v2.41)
 //
 // Sestavený soubor — needituj ho, po aktualizaci by se změny ztratily.
 // Chyba nebo nápad: https://github.com/goringardevang-alt/darkelf-planovac-rozjezdu/issues
@@ -2747,7 +2747,7 @@ if (!window.DarkElfUtils) {
     }
 
     function rjNavrhni() {
-        if (rjSrovnejDen0(rjPlan)) rjUloz();
+        if (rjPosunNaDnes(rjPlan) | rjSrovnejDen0(rjPlan)) rjUloz();
         const P = rjPlan, d = rjVstupy(), st = rjSt(P);
         const vz = P.verbZ || [false, true, false];
         if (!st.den[0].some(x => P.sloty[x].zem)) { P.navrhInfo = 'Navrhni: nevyšlo — vyber aspoň jeden cíl na dnes'; return; }
@@ -3761,7 +3761,7 @@ if (!window.DarkElfUtils) {
     function rjPostav() {
         if (!rjKoren) return;
         const P = rjPlan;
-        if (rjSrovnejDen0(P)) rjUloz();
+        if (rjPosunNaDnes(P) | rjSrovnejDen0(P)) rjUloz();
         rjHotoveTed = rjHotove(P);
 
         if (!rjVlastni && rjData && rjData.moje.length) {
@@ -4610,6 +4610,97 @@ ${rjVlastni ? rjRadekVlastni() : `            <div class="rj-nast">
         });
     }
 
+    function rjPosunNaDnes(P) {
+        if (!P || rjVlastni || !P.sloty || !Array.isArray(P.vetve)) return false;
+        const dnes = rjHerniDen();
+        if (!(dnes > 0)) return false;
+        const st = rjSt(P);
+        if (st.dny < 2 || !rjDen0Zacal(P)) return false;
+
+        const novyDen = cislo(P.den0) > 0 ? dnes > cislo(P.den0) : rjDnesniDen(P, st) >= 1;
+        if (!novyDen) return false;
+        const S = P.sloty;
+        const zdroje = P.zdroje.map(z => Object.assign({}, z));
+        const zdrojZeme = (zem, jinam) => {
+            let i = zdroje.findIndex(z => String(z.zem) === String(zem));
+            if (i < 0) { zdroje.push({ zem: String(zem), dom: ['', '', ''], limit: '', jinam: !!jinam }); i = zdroje.length - 1; }
+            else if (jinam) zdroje[i].jinam = true;
+            return i;
+        };
+
+        const M = window.DarkElfUtils.MapAPI, me = M.getMe && M.getMe();
+        const moje = (zem) => { const z = M.getCountry(zem); return !!(z && me && me.id && String(z.id_hrac) === String(me.id)); };
+        const vetve = [], presuny = [], neprosly = [];
+        P.vetve.forEach(b => {
+            const x0 = b.kroky[0], x1 = b.kroky[1], x2 = b.kroky[2], s0 = S[x0];
+            if (!s0 || !s0.zem || s0.zem === RJ_VLASTNI_ZEM) {
+
+                if (x1 && S[x1] && S[x1].zem) vetve.push({ zdroj: b.zdroj, kroky: [x1, x2].filter(x => x && S[x]) });
+                else [x1, x2].forEach(x => { if (x) delete S[x]; });
+                return;
+            }
+            if (!moje(s0.zem)) {
+                neprosly.push(x0);
+                [x1, x2].forEach(x => { if (x) delete S[x]; });
+                return;
+            }
+            const zi = zdrojZeme(s0.zem, s0.dal === 'presun');
+            if (s0.dal === 'presun') {
+                presuny.push([x0, zi]);
+                vetve.push({ zdroj: zi, kroky: [] });
+                return;
+            }
+            const s1 = S[x1];
+            if (s1) {
+
+                const pr = M.getPrivate(s0.zem) || {};
+                s1.u = rjSecti((posadkaZeme(s0.zem) || [0, 0, 0]).slice(),
+                               [cislo(pr.venku_war1), cislo(pr.venku_war2), cislo(pr.venku_war3)]);
+                s1.p = [0, 0, 0];
+                s1.pj = [];
+                s1.h = !!s0.h;
+            }
+            vetve.push({ zdroj: zi, kroky: [x1, x2].filter(x => x && S[x]) });
+        });
+
+        presuny.forEach(([x0, zi]) => {
+            const roz = (P.rozdel || {})[x0] || {};
+            Object.keys(roz).forEach(y => {
+                if (!S[y] || !Array.isArray(roz[y])) return;
+                if (!Array.isArray(S[y].pj)) S[y].pj = [];
+                S[y].pj[zi] = roz[y].map(cislo);
+            });
+        });
+        const rozdel = {};
+        Object.keys(P.rozdel || {}).forEach(x => { if ((st.denKroku[x] || 0) >= 1) rozdel[x] = P.rozdel[x]; });
+        st.den[0].forEach(x => { delete S[x]; });
+
+        const nove = [], preklad = {};
+        zdroje.forEach((z, i) => { if (vetve.some(b => b.zdroj === i)) { preklad[i] = nove.length; nove.push(z); } });
+        vetve.forEach(b => { b.zdroj = preklad[b.zdroj]; });
+        Object.keys(S).forEach(x => {
+            const pj = S[x] && S[x].pj;
+            if (!Array.isArray(pj)) return;
+            const n = [];
+            pj.forEach((v, i) => { if (v && (i in preklad)) n[preklad[i]] = v; });
+            S[x].pj = n;
+        });
+        zdroje.length = 0;
+        nove.forEach(z => zdroje.push(z));
+        P.zdroje = zdroje;
+        P.vetve = vetve;
+        P.rozdel = rozdel;
+        P.dny = st.dny - 1;
+        P.vetve.forEach(b => {
+            while (b.kroky.length < 3) { const x = rjVolnyStitek(P); b.kroky.push(x); S[x] = rjNovySlot(); }
+        });
+        P.den0 = dnes;
+        P.odemknuto = {};
+        P.navrhInfo = 'Plán posunut na dnešek (herní den ' + dnes + '): zítřejší útoky jsou dnešní — Navrhni je doladí'
+            + (neprosly.length ? ' · neprošlo ' + neprosly.join(', ') + ', jeho cesta vynechána' : '');
+        return true;
+    }
+
     function rjSrovnejDen0(P) {
         if (!P || rjVlastni) return false;
         const dnes = rjHerniDen();
@@ -4656,6 +4747,7 @@ ${rjVlastni ? rjRadekVlastni() : `            <div class="rj-nast">
         const zdrojEl = document.querySelector('input[name="id_zeme_zdroj"]');
         if (T.some(t => !t) || !zdrojEl || document.getElementById('rj-vyplnit')) return;
         rjPlan = rjNactiPlan();
+        if (rjPosunNaDnes(rjPlan) | rjSrovnejDen0(rjPlan)) rjUloz();
         const kroky = rjKrokyZeZeme(rjPlan, zdrojEl.value);
         if (!kroky.length) return;
         const vyber = (n) => document.querySelector('select[name="' + n + '"]');

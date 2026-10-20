@@ -107,5 +107,9 @@ z dobyté země). **Klik** vyplní jednotky, rytíře, hrdinu, cíl i typ akce.
   **○ útok** = dnešní útok ještě neodešel.
 - **🔒** odeslaný krok: čísla jsou pevná, Navrhni na ně nesáhne a vojsko se nepočítá
   doma. Klik na 🔒 odemkne (na dnešní den).
-- Druhý den jsou kroky dne 0 „hotovo 🔒" a plánuje se dál od zítřka. Plán připravený
-  večer dopředu se po přepočtu nezamkne, dokud z něj nic neodejde.
+- **Nový herní den:** po přepočtu se plán sám posune. Dobyté země se stanou zdroji
+  (s vojskem z mapy), zítřejší útoky jsou dnešní a jde je doladit přes Navrhni. Země,
+  která přeposílala, posílá do dnešních útoků. Cesta útoku, který neprošel, se vynechá.
+  V průběhu dne se plán neposouvá.
+- Plán připravený večer dopředu se po přepočtu neposune ani nezamkne, dokud z něj nic
+  neodejde.
