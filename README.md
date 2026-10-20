@@ -15,6 +15,10 @@ a ztrátami.
 - odhad síly neutrálky na zítřek a pozítří (počítá s nejhorším růstem),
 - limit verbu po kolech, domy, rozpočet zlata a many,
 - **Navrhni**: nejmenší verb, nejmenší ztráty (trojky > dvojky > jedničky), volitelně co nejméně rytířů,
+- u každé zdrojové země zvlášť, co v ní smí vzniknout (dvojky chtějí Cech války, trojky Cech magie),
+- hlídá, kam se vojsko vůbec dostane: sousedi a přes volný průchod; kde průchod chybí, napíše,
+  přes kterou zem si ho domluvit,
+- útok bez vyhlášení války (−30 % síly) jako volba u útoku,
 - na stránce **Vojsko** jedním klikem vyplní útok podle plánu (odeslat musíš sám),
 - ukazuje, které útoky z plánu už letí (✓), a odeslané kroky zamkne (🔒),
 - export plánu do textu (třeba pro Discord).
