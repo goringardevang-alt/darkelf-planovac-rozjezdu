@@ -9,8 +9,8 @@ nad mapou (mapa musí být otevřená) a zůstane tam, i když vlevo klikáš na
 - **Posunout:** chyť lištu s názvem. Okno jde vystrčit i za okraj, vidět zůstane kousek lišty.
 - **Šířka:** táhni za levý nebo pravý okraj. Od zhruba 1340 px se nastavení a souhrn
   přesunou do panelu vpravo a okno je nižší.
-- **—** = malé okno na výšku (jen země a jednotky), **❐** = sbalit do jednoho řádku,
-  **✕** = zavřít.
+- **—** = sbalit do jednoho řádku (zpátky **▢**), **❐** = malé okno na výšku
+  (jen země a jednotky; zpátky **□**), **✕** = zavřít.
 - **✎** = vlastní zadání (kapitola 8).
 
 Nahoře je název podle tvaru rozjezdu (počet zemí po každém dni) a stav: **✓ vychází**
