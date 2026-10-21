@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dark Elf - Plánovač rozjezdů
 // @namespace    https://github.com/goringardevang-alt/darkelf-planovac-rozjezdu
-// @version      1.58
+// @version      1.62
 // @description  Plán dobývání neutrálek na dnes, zítra a pozítří z jedné i víc tvých zemí: struktura rozjezdu na klik, přeposílky, limit verbu, rozpočet, tlačítko Navrhni (nejmenší verb a ztráty), vyplnění útoku na stránce Vojsko a kontrola odeslaných útoků. Obsahuje Core Utils v2.42.
 // @author       Gorin & Claude
 // @match        https://www.darkelf.cz/*
@@ -14,7 +14,7 @@
 // ==/UserScript==
 
 // ─────────────────────────────────────────────────────────────
-// Dark Elf - Plánovač rozjezdů v1.58 (s Core Utils v2.42)
+// Dark Elf - Plánovač rozjezdů v1.62 (s Core Utils v2.42)
 //
 // Sestavený soubor — needituj ho, po aktualizaci by se změny ztratily.
 // Chyba nebo nápad: https://github.com/goringardevang-alt/darkelf-planovac-rozjezdu/issues
@@ -2177,7 +2177,7 @@ if (!window.DarkElfUtils) {
         const pouzite = (uz || P.zdroje || []).map(z => String(z.zem));
         const volna = (rjData ? rjData.moje : []).find(z => pouzite.indexOf(z.id) === -1);
         return { zem: (!rjVlastni && volna) ? volna.id : '', dom: ['', '', ''], limit: '', jinam: false,
-                 verbZ: rjVerbZNovy(P) };
+                 verbZ: rjVerbZNovy(P), st: {} };
     }
 
     function rjNazevStruktury(P) {
@@ -2329,7 +2329,18 @@ if (!window.DarkElfUtils) {
 
     const rjSmiVerbZdroju = (zdroje) => (zdroje || []).map(z => [0, 1, 2].map(t => rjSmiVerb(z, t)));
 
-    const RJ_CECH = ['', 'Cech války', 'Cech magie'];
+    const RJ_CECH = [null, { cz: 'Cech války', zl: 3000 }, { cz: 'Cech magie', zl: 3500 }];
+
+    const RJ_STAVBY = [
+        { k: 'm', cz: 'Polní modlitebna', zl: 700, mana: 100, co: '+30 útok, když je útok aspoň 100' },
+        { k: 'c', cz: 'Kamenné cesty', zl: 1600, mana: 0, co: 'útok +5 %' },
+        { k: 'k', cz: 'Katapult', zl: 2000, mana: 0, co: '+60 útok, když je útok aspoň 200' },
+        { k: 'a', cz: 'Aréna', zl: 3600, mana: 0, co: 'útok +10 %' }
+    ];
+
+    const rjCenaStaveb = (z, poleCeny) => RJ_STAVBY.reduce((a, b) => a + (((z || {}).st || {})[b.k] ? b[poleCeny] : 0), 0);
+
+    const rjCenaCechu = (verb) => [1, 2].reduce((a, t) => a + (verb[t] > 0 ? RJ_CECH[t].zl : 0), 0);
 
     function rjRozdelVerb(v, limity, smi) {
         const out = limity.map(() => [0, 0, 0]), volno = limity.map(l => l || 0);
@@ -2379,6 +2390,7 @@ if (!window.DarkElfUtils) {
             for (let t = 0; t < 3; t++) if (v[t] > limitT[t]) return false;
             const z = v[0] * ceny[0][0] + v[1] * ceny[1][0] + v[2] * ceny[2][0];
             const m = v[0] * ceny[0][1] + v[1] * ceny[1][1] + v[2] * ceny[2][1];
+
             return m <= mana && z + domyZl(n) <= zl;
         };
 
@@ -2774,12 +2786,43 @@ if (!window.DarkElfUtils) {
         return Object.assign(kvN(lo), { max: lo < seznam.length ? kv.v : null });
     }
 
+    function rjNejmeneKol(P, vz) {
+        const puvodni = P.kol;
+        const strop = rjKola();
+        const zaloha = JSON.parse(JSON.stringify({ sloty: P.sloty, rozdel: P.rozdel, kol: P.kol }));
+        const vrat = () => { P.sloty = JSON.parse(JSON.stringify(zaloha.sloty)); P.rozdel = JSON.parse(JSON.stringify(zaloha.rozdel)); };
+        const projde = (n) => {
+            P.kol = String(n);
+            const d = rjVstupy();
+            const kv = rjKolikVerbovat(d, vz);
+            const chyby = rjHledej(P, d, kv, null, true).chyby;
+            vrat();
+            return !chyby.some(c => /nestačí/.test(c.text));
+        };
+        let out = null;
+        if (projde(strop)) {
+            let lo = 0, hi = strop;
+            while (lo < hi) { const m = (lo + hi) >> 1; if (projde(m)) hi = m; else lo = m + 1; }
+            out = lo;
+        }
+        P.kol = puvodni;
+        vrat();
+        return out;
+    }
+
     function rjNavrhni() {
         if (rjPosunNaDnes(rjPlan) | rjSrovnejDen0(rjPlan)) rjUloz();
-        const P = rjPlan, d = rjVstupy(), st = rjSt(P);
+        const P = rjPlan, st = rjSt(P);
 
         const vz = [0, 1, 2].map(t => (P.zdroje || []).some(z => rjSmiVerb(z, t)));
         if (!st.den[0].some(x => P.sloty[x].zem)) { P.navrhInfo = 'Navrhni: nevyšlo — vyber aspoň jeden cíl na dnes'; return; }
+
+        let kolZ = null;
+        if (P.kolMin) {
+            const puvodni = rjKola(), nalezeno = rjNejmeneKol(P, vz);
+            if (nalezeno != null && nalezeno < puvodni) { kolZ = puvodni; P.kol = String(nalezeno); }
+        }
+        const d = rjVstupy();
         let kv = rjKolikVerbovat(d, vz), v;
         if (P.omezRytire) {
 
@@ -2798,6 +2841,7 @@ if (!window.DarkElfUtils) {
             ? ' (' + v.verb.zdroje.map((z, i) => rjJmenoZdroje(i) + ' ' + rjTri(z.verb)).join(', ') + ')' : '';
         const verbTxt = kv.limit == null ? 'limit verbu neznámý, jen vojsko doma'
             : 'verb ' + rjTri(kv.v) + poZemich + (kv.max ? ' — šetřím, max by bylo ' + rjTri(kv.max) : '');
+        const kolTxt = kolZ != null ? ' · kol ' + rjKola() + ' místo ' + kolZ : '';
         const nestaci = v.chyby.filter(c => /nestačí/.test(c.text));
 
         const utoky = Object.keys(v.sloty).filter(x => v.sloty[x].pu);
@@ -2810,7 +2854,7 @@ if (!window.DarkElfUtils) {
         const sHrdinou = st.den[0].some(x => P.sloty[x].zem && P.sloty[x].h);
         const maHrdinu = cislo(P.heroAbs) > 0 || cislo(P.heroPct) > 0;
         P.navrhInfo = !v.chyby.length
-            ? `Navrhni: vychází · ${verbTxt} · padne ${rjTri(padli)}${rytirTxt}`
+            ? `Navrhni: vychází · ${verbTxt}${kolTxt} · padne ${rjTri(padli)}${rytirTxt}`
             : nestaci.length && !sHrdinou
                 ? 'Navrhni: nevyšlo — použij hrdinu: ' + (maHrdinu ? 'zaškrtni H u některého dnešního útoku'
                     : rjVlastni ? 'zadej nahoře jeho útok a % a zaškrtni H u útoku' : 'vyber ho nahoře a zaškrtni H u útoku')
@@ -2857,7 +2901,7 @@ if (!window.DarkElfUtils) {
                 }
             });
             const pu = d.puNa(x, 0);
-            const sila = d.sila(u, x === hrdinaZ, !!s.r, !!s.w);
+            const sila = d.sila(u, x === hrdinaZ, !!s.r, !!s.w, ((d.zdroje || [])[zi] || {}).st);
             const padli = pu ? rjZtraty(u, sila, pu.pu) : [0, 0, 0];
             const prezili = rjNezaporne(rjOdecti(u, padli));
             const ok = !!pu && sila >= pu.pu;
@@ -2957,7 +3001,7 @@ if (!window.DarkElfUtils) {
             for (let t = 0; t < 3; t++) {
                 if (verb[t] > 0 && !rjSmiVerb(zz, t)) {
                     chyba('verb', 'verb ' + verb[t] + ' × ' + (t + 1) + '. stupeň' + kde()
-                        + ' — ta zem ho má odškrtnutý' + (RJ_CECH[t] ? ' (' + RJ_CECH[t] + ')' : ''));
+                        + ' — ta zem ho má odškrtnutý' + (RJ_CECH[t] ? ' (' + RJ_CECH[t].cz + ')' : ''));
                 }
             }
 
@@ -2978,12 +3022,17 @@ if (!window.DarkElfUtils) {
                 domy = { vojaku: vojaku, potreba: potreba, mas: di.priv.domu, dokup: dokup,
                          zlato: dokup && d.cenaDomu ? d.cenaDomu(di.priv.domu, dokup) : 0 };
             }
+
+            const stavbyZl = rjCenaStaveb(zz, 'zl') + rjCenaCechu(verb);
             return { zDomova: zDomova[i], doma: doma, verb: verb, celkem: celkem,
-                     zlato: zlato, mana: mana, maxVerb: maxVerb, domy: domy, priv: di.priv || null };
+                     zlato: zlato, mana: mana, maxVerb: maxVerb, domy: domy, priv: di.priv || null,
+                     stavbyZl: stavbyZl, stavbyMana: rjCenaStaveb(zz, 'mana') };
         });
         const soucet = (k) => zd.reduce((a, z) => rjSecti(a, z[k]), [0, 0, 0]);
         const zlato = zd.reduce((a, z) => a + z.zlato, 0), mana = zd.reduce((a, z) => a + z.mana, 0);
         const domyZlato = zd.reduce((a, z) => a + (z.domy ? z.domy.zlato : 0), 0);
+        const stavbyZlato = zd.reduce((a, z) => a + z.stavbyZl, 0);
+        const stavbyMana = zd.reduce((a, z) => a + z.stavbyMana, 0);
         const maxima = zd.filter(z => z.maxVerb != null);
 
         let rozpocet = null;
@@ -3001,7 +3050,8 @@ if (!window.DarkElfUtils) {
         out.verb = { zDomova: soucet('zDomova'), doma: soucet('doma'), verb: soucet('verb'),
                      celkem: zd.reduce((a, z) => a + z.celkem, 0), rozpocet: rozpocet, zlato: zlato, mana: mana,
                      maxVerb: maxima.length ? maxima.reduce((a, z) => a + z.maxVerb, 0) : null,
-                     domy: nZ === 1 ? zd[0].domy : null, domyZlato: domyZlato, zdroje: zd };
+                     domy: nZ === 1 ? zd[0].domy : null, domyZlato: domyZlato,
+                     stavbyZlato: stavbyZlato, stavbyMana: stavbyMana, zdroje: zd };
         out.den1Cile = out.cile[1] || [];
         return out;
     }
@@ -3033,7 +3083,7 @@ if (!window.DarkElfUtils) {
         return P;
     }
 
-    const RJ_POLE_PLANU = ['heroAbs', 'heroPct', 'hrdina', 'rozpocetZl', 'rozpocetMana', 'navrhInfo', 'kol',
+    const RJ_POLE_PLANU = ['heroAbs', 'heroPct', 'hrdina', 'rozpocetZl', 'rozpocetMana', 'navrhInfo', 'kol', 'kolMin', 'stavbyVidet',
                            'zombie', 'omezRytire', 'maxVerb', 'rasa', 'odemknuto', 'den0'];
 
     function rjZPlanuV1(ul) {
@@ -3068,7 +3118,8 @@ if (!window.DarkElfUtils) {
 
         v.zdroje = ul.zdroje.map(z => ({ zem: z.zem || '',
             dom: [0, 1, 2].map(i => { const x = (z.dom || [])[i]; return (x === '' || x == null || cislo(x) === 0) ? '' : cislo(x); }),
-            limit: z.limit != null ? z.limit : '', jinam: !!z.jinam, verbZ: rjVerbZUlozeny(z, ul) }));
+            limit: z.limit != null ? z.limit : '', jinam: !!z.jinam, verbZ: rjVerbZUlozeny(z, ul),
+            st: (z.st && typeof z.st === 'object') ? z.st : {} }));
         v.vetve = ul.vetve.filter(b => Array.isArray(b.kroky) && b.kroky.length)
             .map(b => ({ zdroj: Math.min(cislo(b.zdroj), v.zdroje.length - 1), kroky: b.kroky.slice(0, 3) }));
         v.dny = Math.min(3, Math.max(1, cislo(ul.dny) || 1));
@@ -3308,7 +3359,7 @@ if (!window.DarkElfUtils) {
             if (rjVlastni) {
                 const lim = z.limit !== '' && z.limit != null && !isNaN(parseInt(z.limit, 10)) ? cislo(z.limit) : null;
                 return { zem: z.zem, doma: (z.dom || [0, 0, 0]).map(cislo), priv: null, limitVerbu: lim,
-                         verbZ: z.verbZ };
+                         verbZ: z.verbZ, st: z.st };
             }
 
             const priv = z.zem ? M.getPrivate(z.zem) : null;
@@ -3321,7 +3372,7 @@ if (!window.DarkElfUtils) {
                 return rucne ? n : Math.max(0, n - nezna[t]);
             });
             return { zem: z.zem, doma: doma, odeslano: odeslano[zi], leti: leti[zi] || [0, 0, 0],
-                     priv: priv ? rjRustDomova(priv, z.zem) : null, limitVerbu: lim, verbZ: z.verbZ };
+                     priv: priv ? rjRustDomova(priv, z.zem) : null, limitVerbu: lim, verbZ: z.verbZ, st: z.st };
         });
         return {
             zdroje: zdroje,
@@ -3332,9 +3383,10 @@ if (!window.DarkElfUtils) {
             rozpocet: { zl: cislo(rjPlan.rozpocetZl), mana: cislo(rjPlan.rozpocetMana) },
             cenaDomu: (od, kolik) => window.DarkElfUtils.Growth.housePrice(od, kolik, rjData ? rjData.pocasi : 100),
 
-            sila: (u, hrdina, rytir, postih) => spocitejUtok(u[0], u[1], u[2], {
+            sila: (u, hrdina, rytir, postih, st) => spocitejUtok(u[0], u[1], u[2], {
                 heroAbs: hrdina ? cislo(rjPlan.heroAbs) : 0, heroPct: hrdina ? cislo(rjPlan.heroPct) : 0,
-                knight: !!rytir, postih: !!postih, modlitebna: false, katapult: false, cesty: false, arena: false }),
+                knight: !!rytir, postih: !!postih,
+                modlitebna: !!(st && st.m), katapult: !!(st && st.k), cesty: !!(st && st.c), arena: !!(st && st.a) }),
 
             zombieDoPlanu: false,
 
@@ -3474,6 +3526,10 @@ if (!window.DarkElfUtils) {
             radky.push(' DOMY       ' + (nZ > 1 ? jmenaZdroju[i] + ': ' : '') + 'na ' + z.domy.vojaku + ' vojáků potřeba ' + z.domy.potreba
                 + ', máš ' + z.domy.mas + (z.domy.dokup ? ' → +' + z.domy.dokup + ' = ' + z.domy.zlato + ' zl' : ' ✓'));
         });
+        if (V.stavbyZlato || V.stavbyMana) {
+            radky.push(' STAVBY     ' + V.stavbyZlato + ' zl' + (V.stavbyMana ? ' + ' + V.stavbyMana + ' many' : '')
+                + '   (útočné stavby a cechy k verbu, mimo rozpočet)');
+        }
         radky.push(' CELKEM     padne ' + tri(padli) + (v.chyby.length ? ' · ⚠ ' + v.chyby.length + ' chyb' : ' · vychází ✓'));
         if (radky.some(r => /PÚ \d+~/.test(r))) {
             radky.push(' ~ odhad potřeby: nejhorší růst neutrálky (+' + RJ_NARUST + ' obrany a +' + RJ_OBYV_DEN + ' obyvatel za den)');
@@ -3562,6 +3618,7 @@ if (!window.DarkElfUtils) {
         .rj-smaz:hover { color: #ff6666; }
         .rj-m-cesta { border-bottom: 1px solid #332211; padding: 3px 0; }
         .rj-m-zdroj { color: #ffcc00; font-weight: bold; margin-top: 6px; }
+        .rj-zdroj .rj-stavby { flex: 1 0 100%; display: flex; flex-wrap: wrap; gap: 4px 8px; margin: 2px 0 0 0; padding-left: 4px; }
         .rj-zdroj { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; color: #aaa;
                     border-top: 1px solid #553311; padding-top: 5px; margin-top: 2px; }
         .rj-m-info { color: #ccc; font-size: 10px; line-height: 1.5; margin-left: 14px; }
@@ -3597,6 +3654,10 @@ if (!window.DarkElfUtils) {
         .rj-plus.rj-off { color: #555; border-color: #333; cursor: default; }
         .rj-tg { cursor: pointer; border: 1px solid #555; padding: 0 4px; color: #999; background: #333; }
         .rj-tg.rj-on { color: #ffcc00; border-color: #aa8800; font-weight: bold; }
+        /* Navrhni něco DĚLÁ, kdežto ostatní tlačítka jen přepínají (v1.62, Gorin: „zvětšit,
+           aby se trochu odlišilo od těch přepínacích tlačítek"). */
+        .rj-tg.rj-velke { font-size: 13px; padding: 2px 10px; }
+        .rj-tg.rj-off { color: #555; border-color: #333; cursor: default; font-weight: normal; }
         .rj-ok-t { color: #7fdf7f; font-weight: bold; }
         .rj-pocita { display: inline-block; background: rgba(20,10,0,0.92); border: 1px solid #b8860b; border-radius: 4px;
                      color: #ffcc44; font: bold 11px sans-serif; padding: 1px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.6); }
@@ -3720,6 +3781,9 @@ if (!window.DarkElfUtils) {
         });
     }
 
+    const rjPrepinac = (cesta, popisek, zapnuto, zamceno, titulek) =>
+        `<span class="rj-tg${zapnuto ? ' rj-on' : ''}${zamceno ? ' rj-off' : ''}" data-tg="${cesta}" title="${rjEsc(titulek)}">${popisek}</span>`;
+
     function rjZdrojRadek(zi) {
         const P = rjPlan, z = P.zdroje[zi], M = window.DarkElfUtils.MapAPI;
         const smaz = P.zdroje.length > 1 ? `<span class="rj-smaz" data-smaz-zdroj="${zi}" title="Odebrat zdroj i s jeho útoky">✕</span>` : '';
@@ -3727,6 +3791,11 @@ if (!window.DarkElfUtils) {
             ? `<span class="rj-tg" data-pridat-vetev="${zi}" title="Další útok dnes z této země (nový řádek)">+ útok</span>` : '';
 
         const smiVerb = `<span title="Které stupně se v té zemi verbují. Dvojky chtějí v zemi Cech války, trojky Cech magie — jinde je naverbovat nejde; odškrtnout jde i stupeň, který zem umí, ale verbovat ho tam nechceš. Hlavní útočná jednotka = zaškrtnutá dvojka/trojka s vyšším útokem, jedničky dorovnají zbytek limitu a rozpočtu (snižují ztráty).">verbovat ${[0, 1, 2].map(t => `<label><input type="checkbox" data-zvz="${zi}.${t}"${rjSmiVerb(z, t) ? ' checked' : ''}>${t + 1}</label>`).join('')}</span>`;
+
+        const stavby = P.stavbyVidet
+            ? `<div class="rj-r rj-cely rj-stavby">${RJ_STAVBY.map(b =>
+                `<span class="rj-tg${(z.st || {})[b.k] ? ' rj-on' : ''}" data-st="${zi}.${b.k}" title="${rjEsc(b.cz + ': ' + b.co + ', ' + b.zl + ' zl' + (b.mana ? ' + ' + b.mana + ' many' : ''))}">${rjEsc(b.cz)}</span>`).join('')}</div>`
+            : '';
         const jinam = P.zdroje.length > 1 ? `<label title="Smí tahle země posílat přesun bokem i do útoků ostatních zdrojů? (Jen když k nim vede cesta — soused nebo volný průchod.) Navrhni pak vyrovnává vojsko mezi zeměmi — na domy se počítá všechno, co v zemi je, doma i naverbované."><input type="checkbox" data-c="zdroje.${zi}.jinam"${z.jinam ? ' checked' : ''}> přesun i jinam</label>` : '';
         if (rjVlastni) {
             const tady = z.zem ? M.getCountry(z.zem) : null;
@@ -3735,7 +3804,7 @@ if (!window.DarkElfUtils) {
                     title="Zem, ze které se útočí — začni psát jméno, nabídnou se všechny země na mapě">
                 <span title="Vojsko doma v té zemi (1. / 2. / 3. stupeň)">vojsko doma ${rjTriVstupy('zdroje.' + zi + '.dom', z.dom)}</span>
                 <span title="Kolik smí dnes v té zemi nejvíc naverbovat (limit verbu)">verb max <input class="rj-n" data-k="zdroje.${zi}.limit" value="${z.limit === '' || z.limit == null ? '' : cislo(z.limit)}" placeholder="?"></span>
-                ${smiVerb}${jinam}${pridat}${smaz}</div>`;
+                ${smiVerb}${jinam}${pridat}${smaz}${stavby}</div>`;
         }
         const zeme = (rjData ? rjData.moje : []).map(m =>
             `<option value="${m.id}"${m.id === String(z.zem) ? ' selected' : ''}>${rjEsc(m.jmeno)}</option>`).join('');
@@ -3746,7 +3815,7 @@ if (!window.DarkElfUtils) {
             <select data-zdroj="${zi}" title="Tvoje zem, ze které se dnes útočí">${zeme || '<option value="">(žádná zem)</option>'}</select>
             <span title="Vojsko doma (1. / 2. / 3. stupeň). Prázdné = z mapy, vyplněné přebíjí — třeba když už máš vojsko venku v útoku.">vojsko doma ${rjTriVstupy('zdroje.' + zi + '.dom', z.dom, mapaDoma)}</span>
             <span title="Kolik smí dnes v té zemi nejvíc naverbovat. Prázdné = spočítá se z obyvatel a domů, vyplněné přebíjí.">verb max <input class="rj-n" data-k="zdroje.${zi}.limit" value="${z.limit === '' || z.limit == null ? '' : cislo(z.limit)}" placeholder="?"> <b data-o="z${zi}.max"></b></span>
-            ${smiVerb}${jinam}${pridat}${smaz}</div>`;
+            ${smiVerb}${jinam}${pridat}${smaz}${stavby}</div>`;
     }
 
     function rjPostavMale(hlavicka) {
@@ -3822,9 +3891,9 @@ if (!window.DarkElfUtils) {
             <div class="rj-r"><span class="rj-l">potřeba</span><b data-o="${x}.pu"></b>
                 <input class="rj-n rj-pu" data-k="sloty.${x}.pu" value="${rjEsc(s.pu)}" placeholder="ručně" title="Skutečný potřebný útok, když ho znáš — přebije odhad"></div>
             <div class="rj-r rj-vlevo"><span class="rj-l">útok</span>${rjTriVstupy('sloty.' + x + '.u', s.u, null, H.u)}
-                <label title="Hrdina jde s tímhle útokem — a pokračuje s ním i další dny"><input type="checkbox" data-c="sloty.${x}.h"${s.h ? ' checked' : ''}${H.u ? ' disabled' : ''}>H</label>
-                <label title="Rytíř ×1,1"><input type="checkbox" data-c="sloty.${x}.r"${s.r ? ' checked' : ''}${H.u ? ' disabled' : ''}>R</label>
-                <label title="Útok BEZ vyhlášení války: síla útoku −30 %. Hodí se, když na dobyté zemi chceš hned volný průchod — s válkou by se smlouva dala uzavřít až po přepočtu."><input type="checkbox" data-c="sloty.${x}.w"${s.w ? ' checked' : ''}${H.u ? ' disabled' : ''}>P</label>
+                ${rjPrepinac('sloty.' + x + '.h', 'H', s.h, H.u, 'Hrdina jde s tímhle útokem — a pokračuje s ním i další dny')}
+                ${rjPrepinac('sloty.' + x + '.r', 'R', s.r, H.u, 'Rytíř ×1,1')}
+                ${rjPrepinac('sloty.' + x + '.w', 'P', s.w, H.u, 'Útok BEZ vyhlášení války: síla útoku −30 %. Hodí se, když na dobyté zemi chceš hned volný průchod — s válkou by se smlouva dala uzavřít až po přepočtu.')}
                 ${H.u ? '' : `<span class="rj-tg" data-max="${x}" title="Do útoku všechno, co ve zdroji zbývá po OSTATNÍCH útocích — včetně toho, co tenhle krok posílá přesunem bokem (ten se vynuluje). Na zem, kde hrozí střet s jiným útočníkem: přesun dorazí až po vyhodnocení boje, takže by byl v případě prohry dárek nepříteli.">max</span>`}</div>
             <div class="rj-r rj-dopocet"><span class="rj-l"></span><span class="rj-req" data-o="${x}.req0"></span><span class="rj-req" data-o="${x}.req1"></span><span class="rj-req" data-o="${x}.req2"></span></div>
             <div class="rj-r"><span class="rj-l">síla</span><span data-o="${x}.sila"></span> <span class="rj-pad" data-o="${x}.padli"></span></div>
@@ -3851,8 +3920,8 @@ if (!window.DarkElfUtils) {
 
     function rjKartaDalsi(y, d) {
         const st = rjSt(), x = st.pred[y], s = rjPlan.sloty[y];
-        const rytir = `<label title="Rytíř ×1,1"><input type="checkbox" data-c="sloty.${y}.r"${s.r ? ' checked' : ''}>R</label>`
-            + `<label title="Útok BEZ vyhlášení války: síla útoku −30 %."><input type="checkbox" data-c="sloty.${y}.w"${s.w ? ' checked' : ''}>P</label>`;
+        const rytir = rjPrepinac('sloty.' + y + '.r', 'R', s.r, false, 'Rytíř ×1,1')
+            + rjPrepinac('sloty.' + y + '.w', 'P', s.w, false, 'Útok BEZ vyhlášení války: síla útoku −30 %.');
         return `<div class="rj-karta" data-karta="${y}">
             <div class="rj-r"><b style="color:#ffcc00;">${y}</b> ${rjVyberZeme(y)} <span class="rj-sedy">z ${x}</span> <span class="rj-odeslano" data-o="${y}.odeslano"></span>${rjSmazTl(y)}</div>
             ${rjVlastniPu(y)}
@@ -3978,9 +4047,10 @@ if (!window.DarkElfUtils) {
         rjKoren.querySelector('.rj-telo').innerHTML = hlavicka + '<div class="rj-rozlozeni"><div class="rj-nastaveni">' + rjRadekStruktury() + `
 ${(() => {
 
-            const ovladani = `<label title="Navrhni použije službu rytíř (×1,1) co nejméně — jen u útoků, které bez něj nestačí (i za cenu větších ztrát). Upozorní, jen když je rytíř potřeba u všech útoků. Ruční zaškrtnutí R tím zakázané není."><input type="checkbox" data-c="omezRytire"${P.omezRytire ? ' checked' : ''}> Budget rozjezd</label>
-                <label title="Navrhni naverbuje, co limit a rozpočet dovolí, místo obvyklého „jen co je potřeba". Na rozjezd to není třeba — hodí se, když jdeš na kontakt s nepřítelem a chceš dopředu poslat co největší armádu."><input type="checkbox" data-c="maxVerb"${P.maxVerb ? ' checked' : ''}> Max verb</label>
-                <span class="rj-tg rj-on" data-navrhni title="Spočítá dnešní útoky, přesuny bokem a přeposílky tak, aby všechny útoky prošly. Cíle, hrdinu a ‚přeposílá' nechá.">Navrhni</span>
+            const ovladani = `<span class="rj-tg${P.omezRytire ? ' rj-on' : ''}" data-tg="omezRytire" title="Navrhni použije službu rytíř (×1,1) co nejméně — jen u útoků, které bez něj nestačí (i za cenu větších ztrát). Upozorní, jen když je rytíř potřeba u všech útoků. Ruční zaškrtnutí R tím zakázané není.">Budget rozjezd</span>
+                <span class="rj-tg${P.maxVerb ? ' rj-on' : ''}" data-tg="maxVerb" title="Navrhni naverbuje, co limit a rozpočet dovolí, místo obvyklého „jen co je potřeba". Na rozjezd to není třeba — hodí se, když jdeš na kontakt s nepřítelem a chceš dopředu poslat co největší armádu.">Max verb</span>
+                <span class="rj-tg${P.stavbyVidet ? ' rj-on' : ''}" data-stavby title="Zobrazí u každého zdroje útočné stavby. Jsou jen na zkoušku: zaškrtnutá stavba se přičte k síle dnešních útoků z té země a její cena do rozpočtu. Skript nikde nekontroluje, jestli tam opravdu stojí.">Útočné stavby</span>
+                <span class="rj-tg rj-on rj-velke" data-navrhni title="Spočítá dnešní útoky, přesuny bokem a přeposílky tak, aby všechny útoky prošly. Cíle, hrdinu a ‚přeposílá' nechá.">Navrhni</span>
                 <span data-o="navrh"></span>`;
             return rjVlastni ? rjRadekVlastni(ovladani) : `<div class="rj-nast">
                 <span title="Hrdina, který jde s útokem označeným H. Roletka = tvoji hrdinové ve zdrojích (staty z hero.asp); útok a % jdou přepsat ručně.">hrdina <select data-hrdina>${hrdinove}</select> útok <input class="rj-n" data-k="heroAbs" value="${cislo(P.heroAbs)}"> + <input class="rj-n" data-k="heroPct" value="${cislo(P.heroPct)}"> %</span>
@@ -3992,6 +4062,7 @@ ${(() => {
             <div class="rj-souhrn"><div data-o="souhrn"></div>
                 <div class="rj-r" style="margin-top:2px;${rjVlastni ? ' display:none;' : ''}"><b style="color:#ffcc00;">Kol do verbu</b>
                     <input class="rj-n" data-k="kol" value="${P.kol === '' || P.kol == null ? '' : cislo(P.kol)}" placeholder="${rjKola()}" title="Kolik kol odehraješ před verbem — obyvatelé mezitím přibudou. Prázdné = zbývající kola dnes.">
+                    <label title="Navrhni zkusí, jestli plán projde i s menším počtem kol, a to nejmenší sem zapíše. Kola jsou cennější než pár jednotek navíc. Rozpočet do toho nepočítá — míň kol znamená i míň vydělaného zlata."><input type="checkbox" data-c="kolMin"${P.kolMin ? ' checked' : ''}> nejmíň</label>
                     <span class="rj-sedy">(prázdné = zbývající kola dnes)</span></div>
                 <div class="rj-r" style="margin-top:2px;"><b style="color:#ffcc00;">Rozpočet</b>
                     <input class="rj-n" style="width:60px;" data-k="rozpocetZl" value="${cislo(P.rozpocetZl) || ''}" placeholder="zlato" title="Kolik zlata můžeš dnes dát na verb a domy (ve všech zdrojích dohromady)"> zl
@@ -4149,6 +4220,10 @@ ${(() => {
                 if (pole) pole.placeholder = Z.maxVerb == null ? '?' : String(Z.maxVerb);
             }
         });
+        const stavbyTxt = V.stavbyZlato || V.stavbyMana
+            ? `<br><b style="color:#ffcc00;">Stavby</b> <b class="dec-gold" style="color:#ffcc00;">${V.stavbyZlato}</b> zl`
+              + (V.stavbyMana ? ` + <b style="color:#88aaff;">${V.stavbyMana}</b> many` : '')
+              + ` <span class="rj-sedy">(útočné stavby a cechy k verbu — jen informativně, do rozpočtu se nepočítají)</span>` : '';
         const naverbovat = `<b style="color:#ffcc00;">Naverbovat</b> ${V.celkem ? rjTri(V.verb) + ` = <b class="dec-gold" style="color:#ffcc00;">${V.zlato}</b> zl + <b style="color:#88aaff;">${V.mana}</b> many` : '<span class="rj-ok-t">nic, stačí co máš</span>'}`;
 
         const podrobnosti = (html) => `<details class="rj-podrobnosti"${rjPodrobnosti ? ' open' : ''}><summary>Podrobnosti</summary>${html}</details>`;
@@ -4157,13 +4232,13 @@ ${(() => {
             nastav('souhrn', podrobnosti(`<b style="color:#ffcc00;">Dnes z domova</b> ${rjTri(Z.zDomova)} <span class="rj-sedy">(útoky + přesuny)</span>`
                 + ` · doma ${rjTri(Z.doma)}`
                 + (Z.maxVerb != null ? `<br><b style="color:#ffcc00;">Verb max</b> ` + limitTxt(Z, 0) : '')
-                + (Z.domy ? `<br><b style="color:#ffcc00;">Domy</b> ` + domyTxt(Z.domy) : '')) + naverbovat);
+                + (Z.domy ? `<br><b style="color:#ffcc00;">Domy</b> ` + domyTxt(Z.domy) : '') + stavbyTxt) + naverbovat);
         } else {
             nastav('souhrn', podrobnosti(V.zdroje.map((Z, i) => `<b style="color:#ffcc00;">${rjEsc(rjJmenoZdroje(i))}</b> ze země ${rjTri(Z.zDomova)}`
                     + ` · doma ${rjTri(Z.doma)} · verb ${rjTri(Z.verb)}`
                     + ` · <span title="Všechno vojsko v zemi dnes — doma + naverbované. Na domy se počítá všechno; Navrhni ho mezi zeměmi vyrovnává, kde smí přesun jinam.">vojsko <b data-vojsko="${i}">${Z.doma[0] + Z.doma[1] + Z.doma[2] + Z.celkem}</b></span>`
                     + (Z.maxVerb != null ? ` · <span class="rj-sedy">max</span> ` + limitTxt(Z, i) : '')
-                    + (Z.domy ? `<br><span style="padding-left:12px;">domy ${domyTxt(Z.domy)}</span>` : '')).join('<br>'))
+                    + (Z.domy ? `<br><span style="padding-left:12px;">domy ${domyTxt(Z.domy)}</span>` : '')).join('<br>') + stavbyTxt)
                 + naverbovat + ' <span class="rj-sedy">(všechny zdroje)</span>');
         }
 
@@ -4318,6 +4393,35 @@ ${(() => {
                 const [x, dal] = t.dataset.dal.split(':');
                 rjPlan.sloty[x].dal = dal;
                 rjPlan.navrhInfo = '';
+                rjUloz(); rjPostav(); return;
+            }
+            if (t.dataset.stavby !== undefined) {
+                rjPlan.stavbyVidet = !rjPlan.stavbyVidet;
+                rjUloz(); rjPostav(); return;
+            }
+
+            const tg = t.closest('[data-tg]');
+            if (tg) {
+                if (tg.classList.contains('rj-off')) return;
+
+                const cesta = tg.getAttribute('data-tg');
+                const casti = cesta.split('.');
+                let obj = rjPlan;
+                for (let i = 0; i < casti.length - 1 && obj; i++) obj = obj[casti[i]];
+                if (obj) obj[casti[casti.length - 1]] = !obj[casti[casti.length - 1]];
+                rjPlan.navrhInfo = '';
+                rjUloz(); rjPostav(); return;
+            }
+
+            const st = t.closest('[data-st]');
+            if (st) {
+                const [zi, b] = st.getAttribute('data-st').split('.');
+                const z = rjPlan.zdroje[cislo(zi)];
+                if (z) {
+                    z.st = Object.assign({}, z.st);
+                    if (z.st[b]) delete z.st[b]; else z.st[b] = true;
+                    rjPlan.navrhInfo = '';
+                }
                 rjUloz(); rjPostav(); return;
             }
             if (t.dataset.max) {

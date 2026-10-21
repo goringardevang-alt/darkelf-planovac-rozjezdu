@@ -19,6 +19,8 @@ a ztrátami.
 - hlídá, kam se vojsko vůbec dostane: sousedi a přes volný průchod; kde průchod chybí, napíše,
   přes kterou zem si ho domluvit,
 - útok bez vyhlášení války (−30 % síly) jako volba u útoku,
+- **nejmíň kol**: dohledá nejmenší počet kol do verbu, se kterým plán ještě projde,
+- útočné stavby na zkoušku: zapni je u zdroje a hned vidíš, o kolik by zesílil útok,
 - na stránce **Vojsko** jedním klikem vyplní útok podle plánu (odeslat musíš sám),
 - ukazuje, které útoky z plánu už letí (✓), a odeslané kroky zamkne (🔒),
 - export plánu do textu (třeba pro Discord).

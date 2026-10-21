@@ -16,6 +16,25 @@ nad mapou (mapa musí být otevřená) a zůstane tam, i když vlevo klikáš na
 Nahoře je název podle tvaru rozjezdu (počet zemí po každém dni) a stav: **✓ vychází**
 nebo **⚠ počet chyb**.
 
+![Okno Plánovače s popisem tlačítek](obrazky/okno.png)
+
+1. **struktura** — předvolby tvaru rozjezdu a tvoje uložené (kapitola 2)
+2. **+ zdroj** — další tvoje země, ze které se dnes útočí
+3. **hrdina** — tvoji hrdinové ve zdrojích; útok a % jdou přepsat
+4. **Budget rozjezd** — Navrhni použije co nejméně rytířů
+5. **Max verb** — Navrhni naverbuje, co limit a rozpočet dovolí
+6. **Útočné stavby** — ukáže u zdrojů stavby na zkoušku (kapitola 6)
+7. **Navrhni** — rozpočítá celý plán
+8. **roletka cíle** — sousední neutrálky, od nejslabší; vedle ní **⊕** vloží tu,
+   na které vlevo stojíš
+9. **max** — nasype do útoku všechno, co ve zdroji zbývá
+10. **Kol do verbu** — kolik kol odehraješ, než budeš verbovat
+11. **Rozpočet** — strop na verb a domy
+12. **export** — celý plán do schránky jako text
+
+Zapnuté přepínače svítí žlutě. **Navrhni** je větší, protože jako jediné doopravdy
+počítá — ostatní tlačítka jen přepínají.
+
 ## 2. Struktura rozjezdu
 
 - **struktura**: předvolby 1 › 4 › 6 › 8, 2 › 6 › 10, 2 › 5 › 7 a tvoje uložené (★).
@@ -28,6 +47,29 @@ Každý řádek je jedna cesta: **dnes ▶ zítra ▶ pozítří**. Na kartě dn
 **dál: útočí dál** (zítra útočí celé vojsko z dobyté země) nebo **přeposílá** (vojsko
 z dobyté země se rozdělí do zítřejších útoků ostatních cest).
 
+### 1 › 4 › 6 › 8 — z jedné země, třetí útok přeposílá
+
+![Rozjezd 1 › 4 › 6 › 8](obrazky/rozjezd-1-4-6-8.png)
+
+Klasika pro jednu silnou zem. Dnes z ní jdou tři útoky (A, B, C), zítra pokračují A a B
+dál a **C jen přepošle** svoje vojsko do zítřejších cílů obou zbylých cest — přeposlaná
+armáda dorazí až po dobytí, takže se boje neúčastní a jen doplní stavy. Pozítří se útočí
+z D a E.
+
+### 2 › 6 › 10 — dvě země, všechny cesty útočí dál
+
+![Rozjezd 2 › 6 › 10](obrazky/rozjezd-2-6-10.png)
+
+Dva zdroje po dvou útocích a zítra pokračují všechny čtyři cesty. Nejvíc zemí, ale chce
+to dost vojska — nikdo nikomu nepomáhá.
+
+### 2 › 5 › 7 — dvě země, třetí cesta přeposílá
+
+![Rozjezd 2 › 5 › 7](obrazky/rozjezd-2-5-7.png)
+
+Mezi tím: dvě země, slabší třetí útok se vzdá pokračování a zítra svoje vojsko rozdělí
+do útoků, které jdou z první země.
+
 ## 3. Výběr cílů
 
 - **roletka** u karty nabízí sousední neutrálky země, ze které se útočí, od nejslabší;
@@ -39,9 +81,20 @@ skutečné číslo znáš, napiš ho do políčka **ručně**.
 
 ## 4. Karta útoku
 
-- **útok**: jednotky 1., 2. a 3. stupně; **H** = jde s ním hrdina (pokračuje s ním
-  i další dny), **R** = rytíř (×1,1); **max** = všechno, co ve zdroji zbývá.
-- **+ přesun**: přesun bokem do té země. Boje se neúčastní a zítra je tam celý.
+![Karta útoku](obrazky/karta-utoku.png)
+
+1. **útok** — jednotky 1., 2. a 3. stupně
+2. **H R P** — hrdina (pokračuje s tou cestou i další dny), rytíř (×1,1) a útok **bez
+   vyhlášení války** (síla −30 %). Hodí se, když na dobyté zemi chceš hned volný
+   průchod: s vyhlášenou válkou by smlouva naskočila až po přepočtu.
+3. **max** — nasype do útoku všechno, co ve zdroji zbývá po ostatních útocích, **včetně
+   toho, co ten krok posílá přesunem bokem**. Na zemi, kde hrozí střet s jiným
+   útočníkem, je to to, co chceš: armáda z útoku se při prohře vrátí, kdežto přesun
+   dorazí až po vyhodnocení boje a zůstal by vítězi.
+4. **+ přesun** — přesun bokem do té země. Boje se neúčastní a zítra je tam celý.
+5. **dál** — útočí dál, nebo přeposílá
+6. **karta přeposílky** — kam se zítra rozdělí vojsko z dobyté země
+
 - **síla**: ✓ stačí / ✗ chybí, **padne**: ztráty.
 - **(+N)** pod útokem: kolik jednotek toho stupně chybí. Klik je přidá (zítra do
   přesunu bokem). Šedé = odtud už to poslat nejde.
@@ -55,6 +108,20 @@ skutečné číslo znáš, napiš ho do políčka **ručně**.
   mezi zeměmi.
 - **Zdroj, který jen posílá**: když u něj nevybereš cíl, karta ukáže, kolik pošle
   do kterého útoku, a co zůstane doma. Když odejde všechno, má zelený rámeček a 🔒.
+
+**Kam až se dá poslat.** Vojsko projde k sousedovi, a přes zem, se kterou má **volný
+průchod**, i k jejím sousedům. Dál ne — smlouva se dá uzavřít jen se sousedem a průchod
+se neřetězí. Plánovač to hlídá:
+
+- cíl, kam to jde, vypadá normálně;
+- cíl, kam vede cesta přes zem **bez jakékoli smlouvy**, je živý a má u sebe šedivé
+  **VP** — volný průchod si tam domluvíš a platí **hned** (změna smlouvy jinak naskočí
+  až po přepočtu);
+- cíl, kam se vojsko nedostane ani tak, je zamčený a označený **✖**.
+
+U **zítřejší přeposílky** se smlouvy nečtou vůbec: dobytá zem s okolím ještě nic nemá,
+takže si průchod uděláš s okamžitou platností. Proto se zabírají země vedle sebe — mají
+sice válku s tou, ze které se na ně útočilo, ale mezi sebou nic.
 
 ## 6. Navrhni
 
@@ -71,14 +138,29 @@ skutečné číslo znáš, napiš ho do políčka **ručně**.
 
 Cíle, hrdinu a „přeposílá" Navrhni nemění. Na stejné zadání dá vždy stejný plán.
 
+### Útočné stavby na zkoušku
+
+Tlačítko **Útočné stavby** ukáže u každého zdroje čtyři tlačítka: Polní modlitebna,
+Kamenné cesty, Katapult, Aréna. Zapnutá stavba se **přepočítá do síly dnešních útoků**
+z té země, takže hned vidíš, jestli ti chybějící útok dožene. Nikde se nekontroluje,
+jestli tam opravdu stojí — rozhoduješ ty. Bonus patří zemi, ze které útok vyráží, takže
+na další dny (útok z čerstvě dobyté země) nemá vliv.
+
 ## 7. Verb, domy, rozpočet
 
 - **Naverbovat**: kolik a za kolik zlata a many.
 - **Podrobnosti** (rozbalit): po zemích vojsko doma, verb, limit verbu po kolech,
   domy a kolik dokoupit.
+- **verbovat 1 2 3** u zdroje: které stupně se v té zemi verbují. Dvojky chtějí v zemi
+  Cech války, trojky Cech magie, takže tady zároveň říkáš, co ta zem umí. Ručně vepsaný
+  verb stupně, který má zem odškrtnutý, se hlásí jako chyba.
 - **Kol do verbu**: kolik kol odehraješ před verbem (obyvatelé přibudou). Prázdné =
-  zbývající kola dnes.
+  zbývající kola dnes. Zapni **nejmíň** a Navrhni dohledá nejmenší počet kol, se kterým
+  plán ještě projde, a zapíše ho sem — kolo navíc bývá cennější než pár jednotek.
 - **Rozpočet**: kolik zlata (verb i domy) a many můžeš dnes dát. Prázdné = nehlídá se.
+- **Stavby** v souhrnu: co by stály zapnuté útočné stavby a cechy, které si verb vynutí
+  (Cech války u dvojek, Cech magie u trojek). Je to **jen informace**, do rozpočtu se to
+  nepočítá.
 
 ## 8. Vlastní zadání ✎
 
