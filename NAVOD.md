@@ -1,5 +1,10 @@
 # Návod — Plánovač rozjezdů
 
+> Tenhle návod psal Claude (AI) podle zdrojového kódu Plánovače, ne podle odehraných
+> partií. Obrázky jsou vygenerované ze skutečného skriptu nad vymyšlenou mapou, takže
+> **situace v nich jsou ilustrativní**: ukazují, jak se okno chová a co která věc dělá,
+> ne jak se má hrát. Konkrétní plány z obrázků nemusí ve hře dávat smysl.
+
 ## 1. Otevření a okno
 
 **Okno se otevírá přes neutrálku:** klikni v mapě na neutrální zem a vlevo na její
