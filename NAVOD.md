@@ -91,14 +91,19 @@ skutečné číslo znáš, napiš ho do políčka **ručně**.
 1. **útok** — jednotky 1., 2. a 3. stupně
 2. **H R P** — hrdina (pokračuje s tou cestou i další dny), rytíř (×1,1) a útok **bez
    vyhlášení války** (síla −30 %). Hodí se, když na dobyté zemi chceš hned volný
-   průchod: s vyhlášenou válkou by smlouva naskočila až po přepočtu.
-3. **max** — nasype do útoku všechno, co ve zdroji zbývá po ostatních útocích, **včetně
-   toho, co ten krok posílá přesunem bokem**. Na zemi, kde hrozí střet s jiným
-   útočníkem, je to to, co chceš: armáda z útoku se při prohře vrátí, kdežto přesun
-   dorazí až po vyhodnocení boje a zůstal by vítězi.
+   průchod: s vyhlášenou válkou by smlouva naskočila až po přepočtu. **H** se dá zapnout
+   jen u útoku ze země, ve které hrdina opravdu stojí.
+3. **max** — v té zemi se naverbuje, co limit dovolí, a přebytek se nacpe do téhle
+   větve, ať je na jejím konci co největší armáda. Bez něj jde přebytek za hrdinou.
+   Krotí se to počtem kol do verbu, ne rozpočtem.
 4. **+ přesun** — přesun bokem do té země. Boje se neúčastní a zítra je tam celý.
-5. **dál** — útočí dál, nebo přeposílá
-6. **karta přeposílky** — kam se zítra rozdělí vojsko z dobyté země
+5. **Střet!** — na tu zem útočí i někdo jiný, takže se do ní **nic nepošle přesunem**.
+   Přesun dorazí až po vyhodnocení boje, a když zem získá soupeř, armáda zůstane jemu;
+   útok se v nejhorším vrátí. Zavře všechny cesty naráz: přesun bokem, přesuny
+   z ostatních zdrojů i zítřejší přeposílku do té země.
+6. **dál** — **útočí** (zítra odtud vyrazí celé vojsko), **zůstane** (vojsko v dobyté
+   zemi zůstane a dál se nikam nejde) nebo **přeposílá**
+7. **karta přeposílky** — kam se zítra rozdělí vojsko z dobyté země
 
 - **síla**: ✓ stačí / ✗ chybí, **padne**: ztráty.
 - **(+N)** pod útokem: kolik jednotek toho stupně chybí. Klik je přidá (zítra do
@@ -156,9 +161,9 @@ na další dny (útok z čerstvě dobyté země) nemá vliv.
 - **Naverbovat**: kolik a za kolik zlata a many.
 - **Podrobnosti** (rozbalit): po zemích vojsko doma, verb, limit verbu po kolech,
   domy a kolik dokoupit.
-- **verbovat 1 2 3** u zdroje: které stupně se v té zemi verbují. Dvojky chtějí v zemi
-  Cech války, trojky Cech magie, takže tady zároveň říkáš, co ta zem umí. Ručně vepsaný
-  verb stupně, který má zem odškrtnutý, se hlásí jako chyba.
+- **verbovat 1 2 3** u zdroje: které stupně se v té zemi verbují. Nový plán má zaškrtnuté
+  jen **jedničky** — dvojky chtějí v zemi Cech války a trojky Cech magie, takže je zapínáš
+  vědomě. Ručně vepsaný verb stupně, který má zem odškrtnutý, se hlásí jako chyba.
 - **Kol do verbu**: kolik kol odehraješ před verbem (obyvatelé přibudou). Prázdné =
   zbývající kola dnes. Zapni **nejmíň** a Navrhni dohledá nejmenší počet kol, se kterým
   plán ještě projde, a zapíše ho sem — kolo navíc bývá cennější než pár jednotek.
@@ -166,6 +171,8 @@ na další dny (útok z čerstvě dobyté země) nemá vliv.
 - **Stavby** v souhrnu: co by stály zapnuté útočné stavby a cechy, které si verb vynutí
   (Cech války u dvojek, Cech magie u trojek). Je to **jen informace**, do rozpočtu se to
   nepočítá.
+- **Celkem**: cena za verb a domy dohromady, počet kol (a kolik jich oproti stropu ušetříš),
+  celkové ztráty a stavby jako částka navíc. Export má na konci stejný blok `── CELKEM ──`.
 
 ## 8. Vlastní zadání ✎
 

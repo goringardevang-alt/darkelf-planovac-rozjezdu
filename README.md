@@ -21,6 +21,8 @@ a ztrátami.
 - útok bez vyhlášení války (−30 % síly) jako volba u útoku,
 - **nejmíň kol**: dohledá nejmenší počet kol do verbu, se kterým plán ještě projde,
 - útočné stavby na zkoušku: zapni je u zdroje a hned vidíš, o kolik by zesílil útok,
+- **Střet!**: na zem, o kterou se pere víc útočníků, se nic nepošle přesunem,
+- **max** u útoku: v té zemi naverbovat na doraz a přebytek poslat právě tou větví,
 - na stránce **Vojsko** jedním klikem vyplní útok podle plánu (odeslat musíš sám),
 - ukazuje, které útoky z plánu už letí (✓), a odeslané kroky zamkne (🔒),
 - export plánu do textu (třeba pro Discord).
