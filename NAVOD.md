@@ -32,10 +32,11 @@ nebo **⚠ počet chyb**.
 7. **Navrhni** — rozpočítá celý plán
 8. **roletka cíle** — sousední neutrálky, od nejslabší; vedle ní **⊕** vloží tu,
    na které vlevo stojíš
-9. **max** — nasype do útoku všechno, co ve zdroji zbývá
+9. **max** — v té zemi verbovat na doraz a přebytek poslat touhle větví
 10. **Kol do verbu** — kolik kol odehraješ, než budeš verbovat
 11. **Rozpočet** — strop na verb a domy
-12. **export** — celý plán do schránky jako text
+12. **kopírovat / export / načíst** — plán do schránky jako text, kostra plánu
+    a její načtení (kapitola 9)
 
 Zapnuté přepínače svítí žlutě. **Navrhni** je větší, protože jako jediné doopravdy
 počítá — ostatní tlačítka jen přepínají.
@@ -95,7 +96,10 @@ skutečné číslo znáš, napiš ho do políčka **ručně**.
    jen u útoku ze země, ve které hrdina opravdu stojí.
 3. **max** — v té zemi se naverbuje, co limit dovolí, a přebytek se nacpe do téhle
    větve, ať je na jejím konci co největší armáda. Bez něj jde přebytek za hrdinou.
-   Krotí se to počtem kol do verbu, ne rozpočtem.
+   Krotí se to počtem kol do verbu, ne rozpočtem. **Když zapneš max na víc větvích,
+   přebytek se mezi ně rozdělí** tak, aby na tom byla nejlíp ta nejslabší z nich.
+   To chceš, když útočíš na dvě zemky, kde na obou hrozí střet: se zapnutým Střetem
+   se tam armáda dostane jedině útokem, protože přesun je zakázaný.
 4. **+ přesun** — přesun bokem do té země. Boje se neúčastní a zítra je tam celý.
 5. **Střet!** — na tu zem útočí i někdo jiný, takže se do ní **nic nepošle přesunem**.
    Přesun dorazí až po vyhodnocení boje, a když zem získá soupeř, armáda zůstane jemu;
@@ -180,10 +184,23 @@ Pro výpočet za někoho jiného: rasa, hrdina, zdroje (vojsko doma a limit verb
 a místo neutrálky jde zadat jen **PÚ dnes** a bonus obrany. Plán vlastního zadání se
 ukládá zvlášť. Druhým klikem na ✎ se vrátíš ke svému.
 
-## 9. Export
+## 9. Kopírovat, export a načíst
 
-**export** zkopíruje celý plán do schránky jako text v rámečcích (pro Discord v bloku
-```). U každého útoku síla, potřeba, ztráty, H a R.
+Dole v okně jsou tři tlačítka:
+
+- **kopírovat** — celý plán do schránky jako text v rámečcích (pro Discord v bloku
+  ```). U každého útoku síla, potřeba, ztráty, H a R. Je to ke čtení, zpátky se to
+  načíst nedá.
+- **export** — **kostra** plánu na jeden řádek, třeba
+  `RJ1|m=a3f2|d=3|h=14/29|z=101,102|1:201uH>206u>208u|1:202u|2:203p`. Je v ní jen
+  struktura, země a hrdina, žádná čísla.
+- **načíst** — vloží kostru a podle ní plán přestaví. Hodí se, když plánuješ někomu
+  jinému nebo se k plánu vracíš a nechceš znovu proklikat všechny zemky. Po načtení
+  klikni **Navrhni** a čísla se dopočítají.
+
+Kostra musí být **pro tutéž mapu** (jinak „Tahle kostra je pro jinou mapu."), zdroje
+musí být tvoje země a hrdina se musí trefit útokem i procenty. Když hrdina nesedí,
+použij vlastní zadání ✎. Dokud kostra neprojde, původní plán zůstane, jak byl.
 
 ## 10. Vyplnění útoku na stránce Vojsko
 

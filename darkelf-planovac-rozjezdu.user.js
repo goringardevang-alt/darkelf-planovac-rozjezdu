@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dark Elf - Plánovač rozjezdů
 // @namespace    https://github.com/goringardevang-alt/darkelf-planovac-rozjezdu
-// @version      1.68
+// @version      1.71
 // @description  Plán dobývání neutrálek na dnes, zítra a pozítří z jedné i víc tvých zemí: struktura rozjezdu na klik, přeposílky, limit verbu, rozpočet, tlačítko Navrhni (nejmenší verb a ztráty), vyplnění útoku na stránce Vojsko a kontrola odeslaných útoků. Obsahuje Core Utils v2.42.
 // @author       Gorin & Claude
 // @match        https://www.darkelf.cz/*
@@ -14,7 +14,7 @@
 // ==/UserScript==
 
 // ─────────────────────────────────────────────────────────────
-// Dark Elf - Plánovač rozjezdů v1.68 (s Core Utils v2.42)
+// Dark Elf - Plánovač rozjezdů v1.71 (s Core Utils v2.42)
 //
 // Sestavený soubor — needituj ho, po aktualizaci by se změny ztratily.
 // Chyba nebo nápad: https://github.com/goringardevang-alt/darkelf-planovac-rozjezdu/issues
@@ -2543,12 +2543,14 @@ if (!window.DarkElfUtils) {
             });
         });
 
-        const slotHrdiny = rjSlotMax(P) || (() => {
+        const magnety = (() => {
+            const m = rjSlotyMax(P);
+            if (m.length) return m;
             const h = den0.filter(x => S[x].h)[0];
-            if (!h) return null;
+            if (!h) return [];
             const vet = (P.vetve || []).filter(b => (b.kroky || []).indexOf(h) > -1)[0];
             const kroky = (vet ? vet.kroky : [h]).filter(x => S[x] && S[x].zem);
-            return kroky.length ? kroky[kroky.length - 1] : null;
+            return kroky.length ? [kroky[kroky.length - 1]] : [];
         })();
         const lexMax = (celkem[2] + 1) * (celkem[1] + 1) * (celkem[0] + 1);
         const lexArmady = (a) => ((a[2] * (celkem[1] + 1)) + a[1]) * (celkem[0] + 1) + a[0];
@@ -2568,10 +2570,16 @@ if (!window.DarkElfUtils) {
             if (nZ > 1) for (let i = 0; i < nZ; i++) { const n = suma(domaZdroju[i]) + suma(rec[i]); vyr += n * n; }
 
             let hrd = 0;
-            if (slotHrdiny) {
-                const z = v.sloty[slotHrdiny];
-                const a = (z && (z.zbyde || z.zitra)) || [0, 0, 0];
-                hrd = CENA_HRDINA * (1 - lexArmady(a) / lexMax);
+            if (magnety.length) {
+                let nej = Infinity, soucet = 0;
+                magnety.forEach(x => {
+                    const z = v.sloty[x];
+                    const a = (z && (z.zbyde || z.zitra)) || [0, 0, 0];
+                    const p = lexArmady(a) / lexMax;
+                    if (p < nej) nej = p;
+                    soucet += p;
+                });
+                hrd = CENA_HRDINA * (1 - (0.9 * nej + 0.1 * soucet / magnety.length));
             }
             return jine * CENA_CHYBI * 1e6 + nestaci * CENA_CHYBI * 1000 + chybi * CENA_CHYBI + ztraty
                 + rSloty.reduce((c, x) => c + (S[x].r ? cenaR(x) : 0), 0) + hrd + vyr * 1e-7;
@@ -3266,13 +3274,15 @@ if (!window.DarkElfUtils) {
         return (P.zdroje || []).map((z, i) => st.den[0].some(x => st.zdroj(x) === i && (P.sloty[x] || {}).maxv));
     }
 
-    function rjSlotMax(P) {
-        const st = rjSt(P), S = P.sloty;
-        const x = st.den[0].filter(k => (S[k] || {}).maxv && S[k].zem)[0];
-        if (!x) return null;
-        const vet = (P.vetve || []).filter(b => (b.kroky || []).indexOf(x) > -1)[0];
-        const kroky = (vet ? vet.kroky : [x]).filter(k => S[k] && S[k].zem);
-        return kroky.length ? kroky[kroky.length - 1] : null;
+    function rjSlotyMax(P) {
+        const st = rjSt(P), S = P.sloty, out = [];
+        st.den[0].filter(k => (S[k] || {}).maxv && S[k].zem).forEach(x => {
+            const vet = (P.vetve || []).filter(b => (b.kroky || []).indexOf(x) > -1)[0];
+            const kroky = (vet ? vet.kroky : [x]).filter(k => S[k] && S[k].zem);
+            const konec = kroky.length ? kroky[kroky.length - 1] : null;
+            if (konec && out.indexOf(konec) < 0) out.push(konec);
+        });
+        return out;
     }
 
     const rjDal = (s) => ((s || {}).dal === 'presun' || (s || {}).dal === 'nic') ? s.dal : 'utok';
@@ -3319,6 +3329,13 @@ if (!window.DarkElfUtils) {
         const klic = zeme.join(',');
         rjHrdinoveZ = klic;
         rjHrdinove = null;
+        const out = await rjHrdinoveZemi(zeme);
+        if (rjHrdinoveZ !== klic) return;
+        rjHrdinove = out;
+        if (rjKoren && !rjSbaleno()) rjPostav();
+    }
+
+    async function rjHrdinoveZemi(zeme) {
         const out = [];
         try {
             const ja = window.DarkElfUtils.MapAPI.getMe();
@@ -3333,11 +3350,9 @@ if (!window.DarkElfUtils) {
                 }
             }
         } catch (e) {
-            console.warn('Rozjezd: hrdiny ve zdrojích ' + klic + ' zjistit nešlo:', e.message);
+            console.warn('Rozjezd: hrdiny ve zdrojích ' + zeme.join(',') + ' zjistit nešlo:', e.message);
         }
-        if (rjHrdinoveZ !== klic) return;
-        rjHrdinove = out;
-        if (rjKoren && !rjSbaleno()) rjPostav();
+        return out;
     }
 
     let rjRust = null;
@@ -3494,6 +3509,140 @@ if (!window.DarkElfUtils) {
         radky.forEach(r => { out.push('│ ' + orez(r, W).padEnd(W) + ' │'); });
         out.push('└' + '─'.repeat(W + 2) + '┘');
         return out;
+    }
+
+    const RJ_KOSTRA = 'RJ1';
+    const RJ_KOSTRA_STAV = { utok: 'u', presun: 'p', nic: 'n' };
+
+    function rjOtiskMapy(ids) {
+        const M = window.DarkElfUtils.MapAPI;
+        let h = 0x811c9dc5;
+        for (const id of ids) {
+            const z = M.getCountry(id);
+            if (!z) return null;
+            const t = id + ':' + (z.zeme || '') + ';';
+            for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+        }
+        return (((h >>> 16) ^ (h & 0xffff)) >>> 0).toString(16).padStart(4, '0');
+    }
+
+    function rjIdKostry(zdroje, vetve) {
+        const ids = [];
+        const pridej = (id) => { if (id && id !== RJ_VLASTNI_ZEM && ids.indexOf(String(id)) < 0) ids.push(String(id)); };
+        zdroje.forEach(pridej);
+        vetve.forEach(b => b.forEach(k => pridej(k.zem)));
+        return ids;
+    }
+
+    function rjKostra(P) {
+        P = P || rjPlan;
+        const st = rjSt(P), S = P.sloty;
+        const vetve = P.vetve.map(b => {
+            const kroky = [];
+
+            for (let d = 0; d < st.dny; d++) {
+                const s = S[b.kroky[d]];
+                if (!s) break;
+                kroky.push({ zem: s.zem || '', dal: rjDal(s), h: d === 0 && !!s.h });
+                if (rjDal(s) !== 'utok') break;
+            }
+            return kroky;
+        });
+        const zdroje = P.zdroje.map(z => String(z.zem || ''));
+        return [RJ_KOSTRA, 'm=' + (rjOtiskMapy(rjIdKostry(zdroje, vetve)) || '0000'), 'd=' + st.dny,
+                'h=' + cislo(P.heroAbs) + '/' + cislo(P.heroPct), 'z=' + zdroje.join(',')]
+            .concat(P.vetve.map((b, i) => (b.zdroj + 1) + ':' + vetve[i].map(k =>
+                (k.zem === RJ_VLASTNI_ZEM ? '*' : (k.zem || '-')) + RJ_KOSTRA_STAV[k.dal] + (k.h ? 'H' : '')).join('>')))
+            .join('|');
+    }
+
+    function rjRozeberKostru(text) {
+        const casti = String(text || '').trim().split('|');
+        if (casti[0] !== RJ_KOSTRA) throw new Error('Tohle není kostra rozjezdu (nebo je z jiné verze skriptu).');
+        const k = { vetve: [] }, DAL = { u: 'utok', p: 'presun', n: 'nic' };
+        casti.slice(1).forEach(c => {
+            let m;
+            if ((m = /^m=([0-9a-f]{4})$/.exec(c))) k.otisk = m[1];
+            else if ((m = /^d=([123])$/.exec(c))) k.dny = +m[1];
+            else if ((m = /^h=(\d+)\/(\d+)$/.exec(c))) { k.abs = +m[1]; k.pct = +m[2]; }
+            else if ((m = /^z=([\d,]*)$/.exec(c))) k.zdroje = m[1].split(',');
+            else if ((m = /^(\d+):(.*)$/.exec(c))) {
+                k.vetve.push({ zdroj: +m[1] - 1, kroky: !m[2] ? [] : m[2].split('>').map(t => {
+                    const n = /^(\d+|\*|-)([upn])(H?)$/.exec(t);
+                    if (!n) throw new Error('Kostra je poškozená (krok „' + t + '“).');
+                    return { zem: n[1] === '*' ? RJ_VLASTNI_ZEM : n[1] === '-' ? '' : n[1], dal: DAL[n[2]], h: !!n[3] };
+                }) });
+            } else throw new Error('Kostra je poškozená („' + c.slice(0, 20) + '“).');
+        });
+        if (!k.otisk || !k.dny || k.abs == null || !k.zdroje || !k.vetve.length) throw new Error('Kostra je neúplná.');
+        if (k.vetve.some(b => b.zdroj < 0 || b.zdroj >= k.zdroje.length || b.kroky.length > k.dny)) {
+            throw new Error('Kostra je poškozená (větev mimo zdroje nebo dny).');
+        }
+        return k;
+    }
+
+    async function rjPlanZKostry(text) {
+        const k = rjRozeberKostru(text);
+        if (rjOtiskMapy(rjIdKostry(k.zdroje, k.vetve.map(b => b.kroky))) !== k.otisk) {
+            throw new Error('Tahle kostra je pro jinou mapu.');
+        }
+        let hrdina = '';
+        if (!rjVlastni) {
+            const moje = (rjData ? rjData.moje : []).map(z => String(z.id));
+            if (k.zdroje.some(id => !id || moje.indexOf(String(id)) < 0)) {
+                throw new Error('Země zdrojů nejsou tvoje — použij vlastní zadání ✎.');
+            }
+            if (k.abs || k.pct) {
+                const h = (await rjHrdinoveZemi(k.zdroje)).find(x => cislo(x.utok) === k.abs && cislo(x.pctUtok) === k.pct);
+                if (!h) throw new Error('Hrdina s těmihle parametry tu není — použij vlastní zadání ✎.');
+                hrdina = String(h.id);
+            }
+        }
+        const P = rjVychozi(), vzor = P.zdroje[0];
+        P.zdroje = k.zdroje.map(id => Object.assign({}, vzor, { zem: id || '', dom: ['', '', ''], limit: '', jinam: false,
+                                                              st: {}, verbZ: (vzor.verbZ || RJ_VERB_VYCHOZI).slice() }));
+        P.vetve = k.vetve.map(b => ({ zdroj: b.zdroj, kroky: [] }));
+        P.sloty = {};
+        P.rozdel = {};
+        P.dny = k.dny;
+
+        for (let d = 0; d < 3; d++) {
+            k.vetve.forEach((b, i) => {
+                const x = rjVolnyStitek(P), s = rjNovySlot(), krok = b.kroky[d];
+                P.vetve[i].kroky.push(x);
+                if (krok) { s.zem = krok.zem; s.dal = krok.dal; s.h = d === 0 && krok.h && !!krok.zem; }
+                P.sloty[x] = s;
+            });
+        }
+        P.hrdina = hrdina;
+        P.heroAbs = k.abs;
+        P.heroPct = k.pct;
+        P.den0 = rjHerniDen();
+        P.navrhInfo = 'Kostra načtena — klikni Navrhni, dopočítá čísla';
+        return P;
+    }
+
+    function rjDoSchranky(text, t, popisek) {
+        const hotovo = (ok) => {
+            t.textContent = ok ? 'zkopírováno ✓' : 'kopírování nešlo';
+            setTimeout(() => { t.textContent = popisek; }, 2000);
+        };
+        const w = (rjOkno && rjOkno.ownerDocument && rjOkno.ownerDocument.defaultView) || window;
+        const doc = w.document;
+        const stare = () => {
+            const ta = doc.createElement('textarea');
+            ta.value = text;
+            ta.setAttribute('readonly', '');
+            ta.style.cssText = 'position:fixed; left:-9999px; top:0; opacity:0;';
+            doc.body.appendChild(ta);
+            ta.focus(); ta.select();
+            let ok = false;
+            try { ok = doc.execCommand('copy'); } catch (e) { }
+            ta.remove();
+            hotovo(ok);
+        };
+        if (w.navigator.clipboard && w.isSecureContext) w.navigator.clipboard.writeText(text).then(() => hotovo(true), stare);
+        else stare();
     }
 
     function rjExport() {
@@ -3977,7 +4126,7 @@ if (!window.DarkElfUtils) {
                 })()}
                 ${rjPrepinac('sloty.' + x + '.r', 'R', s.r, H.u, 'Rytíř ×1,1')}
                 ${rjPrepinac('sloty.' + x + '.w', 'P', s.w, H.u, 'Útok BEZ vyhlášení války: síla útoku −30 %. Hodí se, když na dobyté zemi chceš hned volný průchod — s válkou by se smlouva dala uzavřít až po přepočtu.')}
-                ${rjPrepinac('sloty.' + x + '.maxv', 'max', s.maxv, H.u, 'Verbuj v téhle zemi na doraz a přebytek nacpi do téhle větve, ať je na jejím konci co největší armáda. Šetření verbu se na tu zem nevztahuje; krotí se to počtem kol do verbu.')}</div>
+                ${rjPrepinac('sloty.' + x + '.maxv', 'max', s.maxv, H.u, 'Verbuj v téhle zemi na doraz a přebytek nacpi do téhle větve, ať je na jejím konci co největší armáda. Když je max na víc větvích, přebytek se mezi ně rozdělí. Šetření verbu se na tu zem nevztahuje; krotí se to počtem kol do verbu.')}</div>
             <div class="rj-r rj-dopocet"><span class="rj-l"></span><span class="rj-req" data-o="${x}.req0"></span><span class="rj-req" data-o="${x}.req1"></span><span class="rj-req" data-o="${x}.req2"></span></div>
             <div class="rj-r"><span class="rj-l">síla</span><span data-o="${x}.sila"></span> <span class="rj-pad" data-o="${x}.padli"></span></div>
             <div class="rj-r rj-vlevo"><span class="rj-l" title="Přesun bokem — boje se neúčastní, zítra je v ${x} celý">+ přesun</span>${rjTriVstupy('sloty.' + x + '.p', s.p, null, H.p || s.stret)}
@@ -4167,7 +4316,9 @@ ${(() => {
                     <input class="rj-n" style="width:50px;" data-k="rozpocetMana" value="${cislo(P.rozpocetMana) || ''}" placeholder="mana" title="Kolik many můžeš dnes dát na verb"> many
                     <span data-o="rozpocet"></span></div>
                 <div class="rj-r" style="margin-top:6px; justify-content:flex-end; gap:6px;">
-                    <span class="rj-tg" data-export title="Zkopíruje celý plán do schránky jako text: dnes (přesun) > zítra > pozítří, H = hrdina, R = rytíř, P = bez vyhlášení války (−30 %)">export</span>
+                    <span class="rj-tg" data-export title="Zkopíruje celý plán do schránky jako text v rámečcích (třeba do Discordu): dnes (přesun) > zítra > pozítří, H = hrdina, R = rytíř, P = bez vyhlášení války (−30 %)">kopírovat</span>
+                    <span class="rj-tg" data-kostra title="Zkopíruje KOSTRU plánu na jeden řádek (struktura, země, hrdina) — dá se poslat a načíst zpátky tlačítkem načíst. Čísla se nepřenášejí, po načtení se dopočítají přes Navrhni.">export</span>
+                    <span class="rj-tg" data-nacist title="Vloží kostru (z tlačítka export) a podle ní přestaví plán. Musí být pro tutéž mapu; zdroje musí být tvoje a hrdina s týmiž parametry, jinak použij vlastní zadání ✎.">načíst</span>
                     <span class="rj-tg" data-reset title="Smazat celý plán rozjezdu">vymazat</span></div></div></div></div>`;
         rjObnov();
     }
@@ -4552,30 +4703,31 @@ ${(() => {
             }
             if (t.dataset.export !== undefined) {
 
-                const hotovo = (ok) => {
-                    t.textContent = ok ? 'zkopírováno ✓' : 'kopírování nešlo';
-                    setTimeout(() => { t.textContent = 'export'; }, 2000);
-                };
                 let text;
                 try { text = rjExport(); }
-                catch (err) { console.error('Rozjezd: export spadl', err); hotovo(false); return; }
+                catch (err) { console.error('Rozjezd: kopírování spadlo', err); t.textContent = 'kopírování nešlo'; return; }
+                rjDoSchranky(text, t, 'kopírovat');
+                return;
+            }
+            if (t.dataset.kostra !== undefined) {
+                let text;
+                try { text = rjKostra(); }
+                catch (err) { console.error('Rozjezd: export kostry spadl', err); t.textContent = 'export nešel'; return; }
+                rjDoSchranky(text, t, 'export');
+                return;
+            }
+            if (t.dataset.nacist !== undefined) {
 
                 const w = (rjOkno && rjOkno.ownerDocument && rjOkno.ownerDocument.defaultView) || window;
-                const doc = w.document;
-                const stare = () => {
-                    const ta = doc.createElement('textarea');
-                    ta.value = text;
-                    ta.setAttribute('readonly', '');
-                    ta.style.cssText = 'position:fixed; left:-9999px; top:0; opacity:0;';
-                    doc.body.appendChild(ta);
-                    ta.focus(); ta.select();
-                    let ok = false;
-                    try { ok = doc.execCommand('copy'); } catch (e) { }
-                    ta.remove();
-                    hotovo(ok);
-                };
-                if (w.navigator.clipboard && w.isSecureContext) w.navigator.clipboard.writeText(text).then(() => hotovo(true), stare);
-                else stare();
+                const text = w.prompt('Vlož kostru rozjezdu (Ctrl+V). Načtení přepíše dosavadní plán.', '');
+                if (!text || !text.trim()) return;
+                rjPlanZKostry(text).then(P => {
+                    rjPlan = P;
+                    rjUloz(); rjPostav();
+                }, err => {
+                    rjPlan.navrhInfo = 'Načíst: nevyšlo — ' + err.message;
+                    rjPostav();
+                });
                 return;
             }
             if (t.dataset.reset !== undefined) {

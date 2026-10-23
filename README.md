@@ -22,10 +22,12 @@ a ztrátami.
 - **nejmíň kol**: dohledá nejmenší počet kol do verbu, se kterým plán ještě projde,
 - útočné stavby na zkoušku: zapni je u zdroje a hned vidíš, o kolik by zesílil útok,
 - **Střet!**: na zem, o kterou se pere víc útočníků, se nic nepošle přesunem,
-- **max** u útoku: v té zemi naverbovat na doraz a přebytek poslat právě tou větví,
+- **max** u útoku: v té zemi naverbovat na doraz a přebytek poslat právě tou větví;
+  se zapnutým maxem na víc větvích se přebytek mezi ně rozdělí,
 - na stránce **Vojsko** jedním klikem vyplní útok podle plánu (odeslat musíš sám),
 - ukazuje, které útoky z plánu už letí (✓), a odeslané kroky zamkne (🔒),
-- export plánu do textu (třeba pro Discord).
+- export plánu do textu (třeba pro Discord) a **kostra** plánu na jeden řádek, kterou
+  si pošlete a druhý si ji načte, aniž by musel znovu klikat zemky.
 
 Podrobný návod: **[NAVOD.md](NAVOD.md)**.
 
