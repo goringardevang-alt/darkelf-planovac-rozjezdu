@@ -93,7 +93,9 @@ skutečné číslo znáš, napiš ho do políčka **ručně**.
 2. **H R P** — hrdina (pokračuje s tou cestou i další dny), rytíř (×1,1) a útok **bez
    vyhlášení války** (síla −30 %). Hodí se, když na dobyté zemi chceš hned volný
    průchod: s vyhlášenou válkou by smlouva naskočila až po přepočtu. **H** se dá zapnout
-   jen u útoku ze země, ve které hrdina opravdu stojí.
+   jen u útoku ze země, ve které hrdina opravdu stojí. U dalších útoků jeho cesty je
+   **H** zapnuté samo; když ho vypneš, hrdina zůstane v zemi z předchozího dne a dál
+   neútočí (třeba když ho chceš přesunout na jinou frontu). Navrhni tohle nemění.
 3. **max** — v té zemi se naverbuje, co limit dovolí, a přebytek se nacpe do téhle
    větve, ať je na jejím konci co největší armáda. Bez něj jde přebytek za hrdinou.
    Krotí se to počtem kol do verbu, ne rozpočtem. **Když zapneš max na víc větvích,
@@ -128,14 +130,16 @@ průchod**, i k jejím sousedům. Dál ne — smlouva se dá uzavřít jen se so
 se neřetězí. Plánovač to hlídá:
 
 - cíl, kam to jde, vypadá normálně;
-- cíl, kam vede cesta přes zem **bez jakékoli smlouvy**, je živý a má u sebe šedivé
-  **VP** — volný průchod si tam domluvíš a platí **hned** (změna smlouvy jinak naskočí
-  až po přepočtu);
+- cíl, kam vede cesta přes zem **jiného hráče bez jakékoli smlouvy**, je živý a má
+  u sebe šedivé **VP** — volný průchod si tam domluvíš a platí **hned** (změna smlouvy
+  jinak naskočí až po přepočtu). Přes **neutrálku** cesta nevede, s ní smlouvu uzavřít
+  nejde;
 - cíl, kam se vojsko nedostane ani tak, je zamčený a označený **✖**.
 
 U **zítřejší přeposílky** se smlouvy nečtou vůbec: dobytá zem s okolím ještě nic nemá,
 takže si průchod uděláš s okamžitou platností. Proto se zabírají země vedle sebe — mají
-sice válku s tou, ze které se na ně útočilo, ale mezi sebou nic.
+sice válku s tou, ze které se na ně útočilo, ale mezi sebou nic. Přes neutrálku to jde
+jen tehdy, když ji plán do té doby dobude.
 
 ## 6. Navrhni
 
