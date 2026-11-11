@@ -92,8 +92,8 @@ skutečné číslo znáš, napiš ho do políčka **ručně**.
 1. **útok** — jednotky 1., 2. a 3. stupně
 2. **H R P** — hrdina (pokračuje s tou cestou i další dny), rytíř (×1,1) a útok **bez
    vyhlášení války** (síla −30 %). Hodí se, když na dobyté zemi chceš hned volný
-   průchod: s vyhlášenou válkou by smlouva naskočila až po přepočtu. **H** se dá zapnout
-   jen u útoku ze země, ve které hrdina opravdu stojí. U dalších útoků jeho cesty je
+   průchod: s vyhlášenou válkou by smlouva naskočila až po přepočtu. **H** je jen
+   u útoků ze země, ve které hrdina opravdu stojí. U dalších útoků jeho cesty je
    **H** zapnuté samo; když ho vypneš, hrdina zůstane v zemi z předchozího dne a dál
    neútočí (třeba když ho chceš přesunout na jinou frontu). Navrhni tohle nemění.
 3. **max** — v té zemi se naverbuje, co limit dovolí, a přebytek se nacpe do téhle
@@ -148,13 +148,19 @@ jen tehdy, když ji plán do té doby dobude.
 - Navrhni naverbuje **jen tolik, kolik je potřeba**, aby všechno prošlo. Pak hledá
   rozdělení s co nejmenšími ztrátami (trojka je dražší než všechny dvojky, dvojka než
   všechny jedničky).
-- **Budget rozjezd**: co nejméně rytířů.
+- **Budget rozjezd**: co nejméně rytířů — napřed u dnešních útoků, pak celkem. Potřebu
+  dalších dnů plánovač odhaduje z nejhoršího růstu neutrálky, takže tamní rytíř nejspíš
+  potřeba nebude.
 - **Max verb**: naverbuje, co limit a rozpočet dovolí (třeba před střetem s nepřítelem).
 - Přebytečné vojsko jde za hrdinou.
-- Když útok nevyjde ani tak a s žádným útokem nejde hrdina, Navrhni napíše jen
-  „použij hrdinu".
+- **Hrdina**: když H není zapnuté nikde, Navrhni ho dosadí sám k dnešnímu útoku, kde
+  pomůže nejvíc („· hrdina → B"). Pak už ho nechá, kde je — chceš-li, ať ho dosadí znovu,
+  vypni H.
+- Když plán nevyjde, Navrhni napíše, kolik jednotek chybí: „nevyšlo — chybí +4 jedničky
+  nebo +2 dvojky (H)".
 
-Cíle, hrdinu a „přeposílá" Navrhni nemění. Na stejné zadání dá vždy stejný plán.
+Cíle a „přeposílá" Navrhni nemění, hrdinu jen dosadí, když není nikde. Na stejné zadání
+dá vždy stejný plán.
 
 ### Útočné stavby na zkoušku
 

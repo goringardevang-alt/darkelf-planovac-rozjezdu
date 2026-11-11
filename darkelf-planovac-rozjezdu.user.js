@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Dark Elf - Plánovač rozjezdů
 // @namespace    https://github.com/goringardevang-alt/darkelf-planovac-rozjezdu
-// @version      1.81
-// @description  Plán dobývání neutrálek na dnes, zítra a pozítří z jedné i víc tvých zemí: struktura rozjezdu na klik, přeposílky, limit verbu, rozpočet, tlačítko Navrhni (nejmenší verb a ztráty), vyplnění útoku na stránce Vojsko a kontrola odeslaných útoků. Obsahuje Core Utils v2.42.
+// @version      1.85
+// @description  Plán dobývání neutrálek na dnes, zítra a pozítří z jedné i víc tvých zemí: struktura rozjezdu na klik, přeposílky, limit verbu, rozpočet, tlačítko Navrhni (nejmenší verb a ztráty), vyplnění útoku na stránce Vojsko a kontrola odeslaných útoků. Obsahuje Core Utils v2.43.
 // @author       Gorin & Claude
 // @match        https://www.darkelf.cz/*
 // @match        https://www.darkelf.sk/*
@@ -14,7 +14,7 @@
 // ==/UserScript==
 
 // ─────────────────────────────────────────────────────────────
-// Dark Elf - Plánovač rozjezdů v1.81 (s Core Utils v2.42)
+// Dark Elf - Plánovač rozjezdů v1.85 (s Core Utils v2.43)
 //
 // Sestavený soubor — needituj ho, po aktualizaci by se změny ztratily.
 // Chyba nebo nápad: https://github.com/goringardevang-alt/darkelf-planovac-rozjezdu/issues
@@ -25,7 +25,7 @@ if (!window.DarkElfUtils) {
     'use strict';
 
     window.DarkElfUtils = {
-        VERSION: '2.42',
+        VERSION: '2.43',
 
         getLeague: function() {
             const isValid = (val) => val && val !== '0' && val.toLowerCase() !== 'default' && val !== '';
@@ -1834,9 +1834,39 @@ if (!window.DarkElfUtils) {
         });
     }
 
+    window.DarkElfUtils.HeroStaty = {
+        PLATNOST_MS: 10 * 60 * 1000,
+        _STRANKY: /(?:^|\/)(?:hero|artefacts_list)\.asp$/i,
+
+        get: function(id) {
+            return window.DarkElfUtils.Cache.get('heroStat', id);
+        },
+        set: function(id, h) {
+            return window.DarkElfUtils.Cache.set('heroStat', id, h, Date.now() + this.PLATNOST_MS);
+        },
+        zahod: function(id) {
+            if (id == null || id === '') return;
+            window.DarkElfUtils.Cache.set('heroStat', id, null);
+        },
+
+        idZAdresy: function(cesta, dotaz) {
+            if (!this._STRANKY.test(String(cesta || ''))) return null;
+            const m = String(dotaz || '').match(/[?&]h=(\d+)/i);
+            return m ? m[1] : null;
+        },
+
+        _priNacteni: function(okno) {
+            const id = this.idZAdresy(okno.location.pathname, okno.location.search);
+            if (id == null) return;
+            const self = this;
+            this.zahod(id);
+            okno.addEventListener('pagehide', function() { self.zahod(id); });
+        }
+    };
+
     async function nactiHrdinu(id) {
 
-        const zCache = window.DarkElfUtils.Cache.get('heroStat', id);
+        const zCache = window.DarkElfUtils.HeroStaty.get(id);
         if (zCache) return zCache;
 
         const doc = await window.DarkElfUtils.fetchPage('/hero.asp?h=' + id);
@@ -1878,7 +1908,7 @@ if (!window.DarkElfUtils) {
 
         if (!h.precteno) return null;
 
-        window.DarkElfUtils.Cache.set('heroStat', id, h);
+        window.DarkElfUtils.HeroStaty.set(id, h);
         return h;
     }
 
@@ -1986,6 +2016,9 @@ if (!window.DarkElfUtils) {
             }
         }
     }, true);
+
+    try { window.DarkElfUtils.HeroStaty._priNacteni(window); }
+    catch (e) { console.warn('DarkElfUtils.HeroStaty:', e); }
 
     try { window.DarkElfUtils.Prihlaseni._priNacteni(); }
     catch (e) { console.warn('DarkElfUtils.Prihlaseni:', e); }
@@ -2156,6 +2189,21 @@ if (!window.DarkElfUtils) {
             x = y;
         }
         return out;
+    }
+
+    function rjHrdinaJinde(P, st, x) {
+        const hrd = (rjHrdinove || []).filter(h => String(h.id) === String(P.hrdina))[0];
+        const zdrojX = (P.zdroje[st.zdroj(x)] || {}).zem;
+        return !!(hrd && zdrojX && String(hrd.zem) !== String(zdrojX) && !P.sloty[x].h);
+    }
+
+    function rjKandidatiHrdiny(P, st) {
+        const S = P.sloty;
+        const dnes = st.den[0].filter(x => S[x] && S[x].zem);
+        if (dnes.some(x => S[x].h)) return [];
+        if (!(cislo(P.heroAbs) > 0 || cislo(P.heroPct) > 0)) return [];
+        const H = rjHotove(P);
+        return dnes.filter(x => !(H[x] && H[x].u) && !rjHrdinaJinde(P, st, x));
     }
 
     function rjJinam(P, st, x) {
@@ -2520,6 +2568,8 @@ if (!window.DarkElfUtils) {
         while (rec.length < nZ) rec.push([0, 0, 0]);
         const limity = (kv.limity || []).map(l => l || 0);
 
+        const naDoraz = kv.naDoraz || [];
+
         const smiVerb = kv.smi || rjSmiVerbZdroju(P.zdroje);
 
         const kosDef = [];
@@ -2574,8 +2624,11 @@ if (!window.DarkElfUtils) {
         const vaha = [1, maxT1 + 1, (maxT1 + 1) * (celkem[1] + 1)];
         const maxZtrat = maxT1 * vaha[0] + celkem[1] * vaha[1] + celkem[2] * vaha[2];
 
-        const CENA_R = maxZtrat + 1, CENA_CHYBI = budget ? CENA_R * 10 : 2 * maxZtrat + 2;
-        const cenaR = (x) => budget ? CENA_R * (1 + [0.003, 0.002, 0.001][denSlotu(x)]) : 0.001;
+        const CENA_R = maxZtrat + 1;
+        const nDalsich = rSloty.filter(x => denSlotu(x) > 0).length;
+        const CENA_R_DNES = CENA_R * (1.002 * nDalsich + 1);
+        const cenaR = (x) => !budget ? 0.001 : denSlotu(x) === 0 ? CENA_R_DNES : CENA_R * (denSlotu(x) === 1 ? 1.002 : 1.001);
+        const CENA_CHYBI = budget ? rSloty.reduce((c, x) => c + cenaR(x), 0) + CENA_R : 2 * maxZtrat + 2;
 
         const pamet = {};
         const dh = Object.assign({}, d, {
@@ -2662,6 +2715,8 @@ if (!window.DarkElfUtils) {
         const prelij = (t, a, b) => {
             const i = kosZdroj[a], j = kosZdroj[b];
             if (i === j || !kose[a][t] || !(rec[i][t] > 0) || suma(rec[j]) >= limity[j] || !smiVerb[j][t]) return null;
+
+            if (naDoraz[i] && suma(rec[i]) <= limity[i]) return null;
             const pred = domyNaRec();
             rec[i][t]--; rec[j][t]++;
             const po = domyNaRec();
@@ -2823,7 +2878,8 @@ if (!window.DarkElfUtils) {
 
         const klic = (sl) => {
             const r = utoky.filter(x => sl[x].r);
-            return [r.length].concat([0, 1, 2].map(dd => r.filter(x => st.denKroku[x] === dd).length));
+            const poDnech = [0, 1, 2].map(dd => r.filter(x => (st.denKroku[x] || 0) === dd).length);
+            return [poDnech[0], r.length, poDnech[1], poDnech[2]];
         };
         const lepsi = (a, b) => { for (let i = 0; i < 4; i++) if (a[i] !== b[i]) return a[i] < b[i]; return false; };
 
@@ -2931,6 +2987,62 @@ if (!window.DarkElfUtils) {
         const vz = [0, 1, 2].map(t => (P.zdroje || []).some(z => rjSmiVerb(z, t)));
         if (!st.den[0].some(x => P.sloty[x].zem)) { P.navrhInfo = 'Navrhni: nevyšlo — vyber aspoň jeden cíl na dnes'; return; }
 
+        const kandidati = rjKandidatiHrdiny(P, st);
+        let r, dosazen = null;
+        if (kandidati.length) {
+            const snimek = () => JSON.stringify({ sloty: P.sloty, rozdel: P.rozdel, kolNavrh: P.kolNavrh });
+            const obnov = (s) => { const o = JSON.parse(s); P.sloty = o.sloty; P.rozdel = o.rozdel; P.kolNavrh = o.kolNavrh; };
+            const start = snimek();
+            let nej = null;
+            kandidati.forEach(x => {
+                obnov(start);
+                st.den[0].forEach(y => { if (P.sloty[y]) P.sloty[y].h = y === x; });
+                const r1 = rjNavrhniBeh(P, vz);
+                const sk = rjSkoreNavrhu(P, st, r1);
+                if (!nej || rjLexMensi(sk, nej.sk)) nej = { sk: sk, x: x, r: r1, stav: snimek() };
+            });
+            obnov(nej.stav);
+            r = nej.r;
+            dosazen = nej.x;
+        } else r = rjNavrhniBeh(P, vz);
+        const v = r.v, kv = r.kv;
+        const padli = Object.keys(v.sloty).reduce((s, k) => rjSecti(s, v.sloty[k].padli), [0, 0, 0]);
+
+        const poZemich = v.verb.zdroje.length > 1 && v.verb.celkem
+            ? ' (' + v.verb.zdroje.map((z, i) => rjJmenoZdroje(i) + ' ' + rjTri(z.verb)).join(', ') + ')' : '';
+        const verbTxt = kv.limit == null ? 'limit verbu neznámý, jen vojsko doma'
+            : 'verb ' + rjTri(kv.v) + poZemich + (kv.max ? ' — šetřím, max by bylo ' + rjTri(kv.max) : '');
+        const kolTxt = r.kolZ != null ? ' · kol ' + rjKola() + ' místo ' + r.kolZ : '';
+        const nestaci = v.chyby.filter(c => /nestačí/.test(c.text));
+
+        const utoky = Object.keys(v.sloty).filter(x => v.sloty[x].pu);
+        const sRytirem = P.omezRytire ? utoky.filter(x => P.sloty[x].r).sort() : [];
+
+        const rytiruDnes = sRytirem.filter(x => !(st.denKroku[x] || 0)).length;
+        const rytirTxt = !P.omezRytire ? ''
+            : !sRytirem.length ? ' · bez rytíře'
+            : sRytirem.length === utoky.length ? ' · ⚠ rytíř potřeba u všech útoků'
+            : ` · rytíř ${sRytirem.length} z ${utoky.length} (${sRytirem.join(', ')}), dnes ${rytiruDnes || 'žádný'}`;
+        const hrdinaTxt = dosazen ? ' · hrdina → ' + dosazen : '';
+
+        let chybiTxt = '';
+        if (v.chyby.length && nestaci.length) {
+            const kde = nestaci.map(c => c.slot).filter((x, i, a) => a.indexOf(x) === i).join(', ');
+            const moznosti = rjChybiJednotek(P, st, r);
+            const viceZdroju = (P.zdroje || []).length > 1;
+            chybiTxt = moznosti.length
+                ? 'chybí ' + moznosti.map(m => '+' + rjKusu(m.n, m.t) + (viceZdroju ? ' v ' + rjJmenoZdroje(m.zi) : '')).join(' nebo ') + ' (' + kde + ')'
+                : kde + ' nevyjde ani s ' + RJ_STROP_POSILY + ' jednotkami navíc';
+        }
+        P.navrhInfo = !v.chyby.length
+            ? `Navrhni: vychází · ${verbTxt}${kolTxt} · padne ${rjTri(padli)}${rytirTxt}${hrdinaTxt}`
+            : chybiTxt
+                ? `Navrhni: nevyšlo — ${chybiTxt}${hrdinaTxt}`
+                : `Navrhni: nevyšlo — ${v.chyby.length} ${v.chyby.length === 1 ? 'chyba' : 'chyb'} (viz níž)`;
+    }
+
+    function rjNavrhniBeh(P, vz) {
+
         let kolZ = null;
         P.kolNavrh = null;
         if (P.kolMin) {
@@ -2938,11 +3050,11 @@ if (!window.DarkElfUtils) {
             if (nalezeno != null && nalezeno < puvodni) { kolZ = puvodni; P.kolNavrh = nalezeno; }
         }
         const d = rjVstupy();
-        let kv = rjKolikVerbovat(d, vz), v;
+        let kv = rjKolikVerbovat(d, vz), v, R = null;
         if (P.omezRytire) {
 
             v = rjBudget(P, d, kv);
-            const R = {};
+            R = {};
             Object.keys(v.sloty).forEach(x => { R[x] = !!P.sloty[x].r; });
             if (kv.limit != null && !P.maxVerb) kv = rjNejmensiVerb(P, d, kv, R);
             v = rjHledej(P, d, kv, R);
@@ -2950,33 +3062,58 @@ if (!window.DarkElfUtils) {
             if (kv.limit != null && !P.maxVerb) kv = rjNejmensiVerb(P, d, kv);
             v = rjHledej(P, d, kv);
         }
+        return { d: d, kv: kv, v: v, kolZ: kolZ, R: R };
+    }
+
+    const rjLexMensi = (a, b) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] < b[i]; return false; };
+
+    function rjSkoreNavrhu(P, st, r) {
+        const v = r.v;
+        let jine = 0, nestaci = 0, chybi = 0;
+        v.chyby.forEach(c => { const m = /nestačí o (\d+)/.exec(c.text); if (m) { chybi += +m[1]; nestaci++; } else if (c.slot !== 'verb') jine++; });
+        const out = [jine, nestaci, chybi];
+        if (P.omezRytire) {
+            const sR = Object.keys(v.sloty).filter(x => v.sloty[x].pu && P.sloty[x].r);
+            const den = (dd) => sR.filter(x => (st.denKroku[x] || 0) === dd).length;
+            out.push(den(0), sR.length, den(1), den(2));
+        }
         const padli = Object.keys(v.sloty).reduce((s, k) => rjSecti(s, v.sloty[k].padli), [0, 0, 0]);
+        const verb = r.kv.v || [0, 0, 0];
+        out.push(verb[0] + verb[1] + verb[2], padli[2], padli[1], padli[0]);
+        return out;
+    }
 
-        const poZemich = v.verb.zdroje.length > 1 && v.verb.celkem
-            ? ' (' + v.verb.zdroje.map((z, i) => rjJmenoZdroje(i) + ' ' + rjTri(z.verb)).join(', ') + ')' : '';
-        const verbTxt = kv.limit == null ? 'limit verbu neznámý, jen vojsko doma'
-            : 'verb ' + rjTri(kv.v) + poZemich + (kv.max ? ' — šetřím, max by bylo ' + rjTri(kv.max) : '');
-        const kolTxt = kolZ != null ? ' · kol ' + rjKola() + ' místo ' + kolZ : '';
-        const nestaci = v.chyby.filter(c => /nestačí/.test(c.text));
+    const RJ_STROP_POSILY = 200;
+    const RJ_JEDNOTKY = [['jednička', 'jedničky', 'jedniček'], ['dvojka', 'dvojky', 'dvojek'], ['trojka', 'trojky', 'trojek']];
+    const rjKusu = (n, t) => n + ' ' + RJ_JEDNOTKY[t][n === 1 ? 0 : n < 5 ? 1 : 2];
 
-        const utoky = Object.keys(v.sloty).filter(x => v.sloty[x].pu);
-        const sRytirem = P.omezRytire ? utoky.filter(x => P.sloty[x].r).sort() : [];
-        const rytirTxt = !P.omezRytire ? ''
-            : !sRytirem.length ? ' · bez rytíře'
-            : sRytirem.length === utoky.length ? ' · ⚠ rytíř potřeba u všech útoků'
-            : ` · rytíř ${sRytirem.length} z ${utoky.length} (${sRytirem.join(', ')})`;
-
-        const sHrdinou = st.den[0].some(x => P.sloty[x].zem && P.sloty[x].h);
-        const maHrdinu = cislo(P.heroAbs) > 0 || cislo(P.heroPct) > 0;
-        P.navrhInfo = !v.chyby.length
-            ? `Navrhni: vychází · ${verbTxt}${kolTxt} · padne ${rjTri(padli)}${rytirTxt}`
-            : nestaci.length && !sHrdinou
-                ? 'Navrhni: nevyšlo — použij hrdinu: ' + (maHrdinu ? 'zaškrtni H u některého dnešního útoku'
-                    : rjVlastni ? 'zadej nahoře jeho útok a % a zaškrtni H u útoku' : 'vyber ho nahoře a zaškrtni H u útoku')
-            : nestaci.length
-                ? `Navrhni: nevyšlo ani s plným verbem (${verbTxt}) — ` + nestaci.map(c => c.slot + ' o ' + (/o (\d+)/.exec(c.text) || [])[1]).join(', ')
-                  + ' · na tenhle tvar vojsko nestačí: uber útok, přidej zdroj nebo verb, silnějšího hrdinu'
-                : `Navrhni: nevyšlo — ${v.chyby.length} ${v.chyby.length === 1 ? 'chyba' : 'chyb'} (viz níž)`;
+    function rjChybiJednotek(P, st, r) {
+        const d = r.d, kv = r.kv;
+        const zaloha = JSON.stringify({ sloty: P.sloty, rozdel: P.rozdel });
+        const smi = kv.smi || rjSmiVerbZdroju(d.zdroje);
+        const projde = (zi, t, n) => {
+            const navic = [0, 0, 0]; navic[t] = n;
+            const d2 = Object.assign({}, d, { zdroje: d.zdroje.map((z, i) => i !== zi ? z
+                : Object.assign({}, z, { doma: rjSecti((z.doma || [0, 0, 0]).map(cislo), navic) })) });
+            const ok = !rjHledej(P, d2, kv, r.R, true).chyby.some(c => /nestačí/.test(c.text));
+            const o = JSON.parse(zaloha); P.sloty = o.sloty; P.rozdel = o.rozdel;
+            return ok;
+        };
+        const nej = {};
+        (d.zdroje || []).forEach((z, zi) => {
+            const pouziva = st.den[0].some(x => P.sloty[x] && P.sloty[x].zem && st.zdroj(x) === zi) || (P.zdroje[zi] || {}).jinam;
+            if (!pouziva) return;
+            let stupne = [0, 1, 2].filter(t => smi[zi] && smi[zi][t]);
+            if (!stupne.length) stupne = [0];
+            stupne.forEach(t => {
+                let spatne = 0, dobre = 1;
+                while (dobre < RJ_STROP_POSILY && !projde(zi, t, dobre)) { spatne = dobre; dobre *= 2; }
+                if (dobre >= RJ_STROP_POSILY) { dobre = RJ_STROP_POSILY; if (!projde(zi, t, dobre)) return; }
+                while (dobre - spatne > 1) { const m = (spatne + dobre) >> 1; if (projde(zi, t, m)) dobre = m; else spatne = m; }
+                if (!nej[t] || dobre < nej[t].n) nej[t] = { zi: zi, t: t, n: dobre };
+            });
+        });
+        return [0, 1, 2].filter(t => nej[t]).map(t => nej[t]);
     }
 
     const rjSecti = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -3188,7 +3325,7 @@ if (!window.DarkElfUtils) {
     let rjPlan = null, rjData = null, rjOkno = null, rjKoren = null;
     let rjPocita = false;
 
-    let rjHrdinove = null, rjHrdinoveZ = null;
+    let rjHrdinove = null, rjHrdinoveZ = null, rjHrdinoveKdy = 0;
 
     const RJ_REZIM = 'de_rozjezd_rezim', RJ_POZICE = 'de_rozjezd_pozice', RJ_SIRKA = 'de_rozjezd_sirka';
 
@@ -3209,7 +3346,7 @@ if (!window.DarkElfUtils) {
     }
 
     const RJ_POLE_PLANU = ['heroAbs', 'heroPct', 'hrdina', 'rozpocetZl', 'rozpocetMana', 'navrhInfo', 'kol', 'kolMin', 'kolNavrh', 'stavbyVidet',
-                           'zombie', 'omezRytire', 'maxVerb', 'rasa', 'odemknuto', 'den0'];
+                           'zombie', 'omezRytire', 'maxVerb', 'rasa', 'odemknuto', 'den0', 'heroZ'];
 
     function rjZPlanuV1(ul) {
         const v = rjVychozi();
@@ -3422,9 +3559,11 @@ if (!window.DarkElfUtils) {
         const klic = zeme.join(',');
         rjHrdinoveZ = klic;
         rjHrdinove = null;
+        rjHrdinoveKdy = Date.now();
         const out = await rjHrdinoveZemi(zeme);
         if (rjHrdinoveZ !== klic) return;
         rjHrdinove = out;
+        if (rjPlan && rjSrovnejHrdinu(rjPlan)) rjUloz();
         if (rjKoren && !rjSbaleno()) rjPostav();
     }
 
@@ -4215,12 +4354,9 @@ if (!window.DarkElfUtils) {
             <div class="rj-r rj-vlevo"><span class="rj-l">útok</span>${rjTriVstupy('sloty.' + x + '.u', s.u, null, H.u)}
                 ${(() => {
 
-                    const hrd = (rjHrdinove || []).filter(h => String(h.id) === String(P.hrdina))[0];
-                    const zdrojX = (P.zdroje[st.zdroj(x)] || {}).zem;
-                    const jinde = hrd && zdrojX && String(hrd.zem) !== String(zdrojX) && !s.h;
-                    return rjPrepinac('sloty.' + x + '.h', 'H', s.h, H.u || jinde,
-                        jinde ? 'Hrdina ' + (hrd.jmeno || '') + ' stojí v jiné zemi (' + (rjJmeno(hrd.zem) || hrd.zem) + '), odtud vyrazit nemůže'
-                              : 'Hrdina jde s tímhle útokem — a pokračuje s ním i další dny, dokud u dalšího útoku H nevypneš');
+                    if (rjHrdinaJinde(P, st, x)) return '';
+                    return rjPrepinac('sloty.' + x + '.h', 'H', s.h, H.u,
+                        'Hrdina jde s tímhle útokem — a pokračuje s ním i další dny, dokud u dalšího útoku H nevypneš');
                 })()}
                 ${rjPrepinac('sloty.' + x + '.r', 'R', s.r, H.u, 'Rytíř ×1,1')}
                 ${rjPrepinac('sloty.' + x + '.w', 'P', s.w, H.u, 'Útok BEZ vyhlášení války: síla útoku −30 %. Hodí se, když na dobyté zemi chceš hned volný průchod — s válkou by se smlouva dala uzavřít až po přepočtu.')}
@@ -4380,7 +4516,8 @@ if (!window.DarkElfUtils) {
         if (male) { rjPostavMale(hlavicka); return; }
 
         const zemeZdroju = P.zdroje.map(z => String(z.zem || '')).filter(Boolean);
-        if (!rjVlastni && zemeZdroju.length && rjHrdinoveZ !== zemeZdroju.join(',')) rjNactiHrdiny(zemeZdroju);
+        if (!rjVlastni && zemeZdroju.length && (rjHrdinoveZ !== zemeZdroju.join(',') || rjHrdinoveZastarali(P))) rjNactiHrdiny(zemeZdroju);
+        if (rjHrdinove && rjSrovnejHrdinu(P)) rjUloz();
         if (!rjVlastni && !rjRust) rjNactiRust();
 
         rjDoplnHrdinu(P);
@@ -4425,7 +4562,31 @@ ${(() => {
         if (rjVlastni || P.hrdina || !rjHrdinove || !rjHrdinove.length) return;
         const h = rjHrdinove[0];
         P.hrdina = String(h.id); P.heroAbs = h.utok; P.heroPct = h.pctUtok;
+        P.heroZ = { abs: h.utok, pct: h.pctUtok };
         rjUloz();
+    }
+
+    function rjSrovnejHrdinu(P) {
+        if (rjVlastni || !P || !P.hrdina || !rjHrdinove) return false;
+        const h = rjHrdinove.find(x => String(x.id) === String(P.hrdina));
+        if (!h) return false;
+        const z = P.heroZ;
+        if (z && (cislo(P.heroAbs) !== cislo(z.abs) || cislo(P.heroPct) !== cislo(z.pct))) return false;
+        const zmena = cislo(P.heroAbs) !== cislo(h.utok) || cislo(P.heroPct) !== cislo(h.pctUtok);
+        const novaZnacka = !z || cislo(z.abs) !== cislo(h.utok) || cislo(z.pct) !== cislo(h.pctUtok);
+        P.heroAbs = h.utok; P.heroPct = h.pctUtok;
+        P.heroZ = { abs: h.utok, pct: h.pctUtok };
+        if (zmena) P.navrhInfo = '';
+        return zmena || novaZnacka;
+    }
+
+    const RJ_HRDINOVE_ZNOVU_MS = 30000;
+    function rjHrdinoveZastarali(P) {
+        const HS = window.DarkElfUtils.HeroStaty;
+        if (!HS || !P || !P.hrdina || !rjHrdinove) return false;
+        if (Date.now() - rjHrdinoveKdy < RJ_HRDINOVE_ZNOVU_MS) return false;
+        if (!rjHrdinove.some(h => String(h.id) === String(P.hrdina))) return false;
+        return HS.get(P.hrdina) === null;
     }
 
     function rjHrdinoveVolby(P) {
@@ -4921,7 +5082,8 @@ ${(() => {
         if (t.dataset.hrdina !== undefined) {
             const h = (rjHrdinove || []).find(x => String(x.id) === t.value);
             rjPlan.hrdina = t.value;
-            if (h) { rjPlan.heroAbs = h.utok; rjPlan.heroPct = h.pctUtok; }
+            if (h) { rjPlan.heroAbs = h.utok; rjPlan.heroPct = h.pctUtok; rjPlan.heroZ = { abs: h.utok, pct: h.pctUtok }; }
+            else delete rjPlan.heroZ;
             rjUloz(); rjPostav(); return;
         }
     }
