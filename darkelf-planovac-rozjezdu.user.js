@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Dark Elf - Plánovač rozjezdů
 // @namespace    https://github.com/goringardevang-alt/darkelf-planovac-rozjezdu
-// @version      1.85
-// @description  Plán dobývání neutrálek na dnes, zítra a pozítří z jedné i víc tvých zemí: struktura rozjezdu na klik, přeposílky, limit verbu, rozpočet, tlačítko Navrhni (nejmenší verb a ztráty), vyplnění útoku na stránce Vojsko a kontrola odeslaných útoků. Obsahuje Core Utils v2.43.
+// @version      1.86
+// @description  Plán dobývání neutrálek na dnes, zítra a pozítří z jedné i víc tvých zemí: struktura rozjezdu na klik, přeposílky, limit verbu, rozpočet, tlačítko Navrhni (nejmenší verb a ztráty), vyplnění útoku na stránce Vojsko a kontrola odeslaných útoků. Obsahuje Core Utils v2.45.
 // @author       Gorin & Claude
 // @match        https://www.darkelf.cz/*
 // @match        https://www.darkelf.sk/*
@@ -14,7 +14,7 @@
 // ==/UserScript==
 
 // ─────────────────────────────────────────────────────────────
-// Dark Elf - Plánovač rozjezdů v1.85 (s Core Utils v2.43)
+// Dark Elf - Plánovač rozjezdů v1.86 (s Core Utils v2.45)
 //
 // Sestavený soubor — needituj ho, po aktualizaci by se změny ztratily.
 // Chyba nebo nápad: https://github.com/goringardevang-alt/darkelf-planovac-rozjezdu/issues
@@ -25,7 +25,7 @@ if (!window.DarkElfUtils) {
     'use strict';
 
     window.DarkElfUtils = {
-        VERSION: '2.43',
+        VERSION: '2.45',
 
         getLeague: function() {
             const isValid = (val) => val && val !== '0' && val.toLowerCase() !== 'default' && val !== '';
@@ -280,12 +280,40 @@ if (!window.DarkElfUtils) {
             "orcs":         { 1: { attack: 2, defence: 4 }, 2: { attack: 5, defence: 3 }, 3: { attack: 3, defence: 3 } },
             "uruks":        { 1: { attack: 3, defence: 3 }, 2: { attack: 7, defence: 1 }, 3: { attack: 5, defence: 3 } },
             "necromancers": { 1: { attack: 1, defence: 4 }, 2: { attack: 7, defence: 2 }, 3: { attack: 5, defence: 3 } },
-            "magi":         { 1: { attack: 2, defence: 5 }, 2: { attack: 7, defence: 2 }, 3: { attack: 3, defence: 5 } },
+            "magi":         { 1: { attack: 3, defence: 5 }, 2: { attack: 7, defence: 2 }, 3: { attack: 3, defence: 5 } },
             "elves":        { 1: { attack: 2, defence: 6 }, 2: { attack: 6, defence: 4 }, 3: { attack: 5, defence: 5 } },
             "dark elves":   { 1: { attack: 3, defence: 5 }, 2: { attack: 8, defence: 3 }, 3: { attack: 4, defence: 5 } },
             "dwarves":      { 1: { attack: 2, defence: 7 }, 2: { attack: 5, defence: 6 }, 3: { attack: 3, defence: 7 } },
             "hobbits":      { 1: { attack: 2, defence: 2 }, 2: { attack: 4, defence: 2 }, 3: { attack: 1, defence: 2 } },
             "ents":         { 1: { attack: 4, defence: 6 }, 2: { attack: 8, defence: 8 }, 3: { attack: 3, defence: 6 } }
+        },
+
+        UnitPrices: {
+            "men":          [[30, 0], [90, 7],   [150, 20]],
+            "barbarians":   [[40, 0], [100, 5],  [160, 20]],
+            "orcs":         [[30, 0], [160, 8],  [100, 30]],
+            "uruks":        [[50, 0], [130, 4],  [120, 30]],
+            "necromancers": [[10, 0], [0, 15],   [150, 15]],
+            "magi":         [[0, 5],  [0, 20],   [0, 15]],
+            "elves":        [[25, 0], [60, 8],   [100, 15]],
+            "dark elves":   [[30, 0], [50, 9],   [60, 10]],
+            "dwarves":      [[10, 0], [40, 2],   [200, 2]],
+            "hobbits":      [[22, 0], [100, 10], [100, 30]],
+            "ents":         [[20, 0], [90, 0],   [200, 0]]
+        },
+
+        UnitWages: {
+            "men":          [1, 5, 10],
+            "barbarians":   [2, 4, 11],
+            "orcs":         [2, 9, 14],
+            "uruks":        [2, 5, 15],
+            "necromancers": [1, 3, 10],
+            "magi":         [1, 6, 7],
+            "elves":        [1, 5, 9],
+            "dark elves":   [1, 5, 10],
+            "dwarves":      [1, 3, 9],
+            "hobbits":      [3, 10, 17],
+            "ents":         [0, 0, 0]
         },
 
         FortressMap: {
@@ -1420,7 +1448,7 @@ if (!window.DarkElfUtils) {
             'Odražeč štítů':       { cena: 100,  typ: 'cervene', rasa: 'Temní elfové' },
             'Neovlivnitelnost':    { cena: 120,  typ: 'zlute',   rasa: 'Trpaslíci' },
             'Uzdravení':           { cena: 125,  typ: 'zlute',   rasa: 'Elfové' },
-            'Povodeň':             { cena: 300,  typ: 'cervene', rasa: 'Skřeti' },
+            'Povodeň':             { cena: 200,  typ: 'cervene', rasa: 'Skřeti' },
             'Zasypání':            { cena: 800,  typ: 'cervene', rasa: 'Mágové' },
             'Zmrtvýchvstání':      { cena: 1200, typ: 'zlute',   rasa: 'Nekromanti' }
         },
@@ -2047,6 +2075,12 @@ if (!window.DarkElfUtils) {
         return;
     }
 
+    if (!window.DarkElfUtils.UnitPrices) {
+        console.error('Dark Elf - Rozjezd: jádro v' + window.DarkElfUtils.VERSION
+            + ' nemá ceník jednotek (potřeba ≥ 2.45). Aktualizuj Core Utils nebo Magického správce.');
+        return;
+    }
+
     function rjHostitel() {
         return rjVSousednimRamu('__deRozjezd');
     }
@@ -2307,19 +2341,7 @@ if (!window.DarkElfUtils) {
         catch (e) { }
     }
 
-    const RJ_CENY = {
-        men:          [[30, 0], [90, 7], [150, 20]],
-        necromancers: [[10, 0], [0, 15], [150, 15]],
-        barbarians:   [[40, 0], [100, 5], [160, 20]],
-        elves:        [[25, 0], [60, 8], [100, 15]],
-        ents:         [[20, 0], [90, 0], [200, 0]],
-        hobbits:      [[22, 0], [100, 10], [100, 25]],
-        magi:         [[0, 4], [0, 20], [0, 15]],
-        orcs:         [[30, 0], [200, 9], [100, 30]],
-        uruks:        [[50, 0], [130, 4], [120, 30]],
-        'dark elves': [[30, 0], [50, 9], [60, 10]],
-        dwarves:      [[10, 0], [40, 2], [200, 2]]
-    };
+    const RJ_CENY = window.DarkElfUtils.UnitPrices;
 
     function rjPotrebnyUtok(z, den, dny, narust, obyvDen) {
         if (!z || z.min_utok == null) return null;
